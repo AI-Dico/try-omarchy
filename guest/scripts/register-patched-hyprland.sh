@@ -193,8 +193,8 @@ build_packages_json=${metadata[21]}
 [[ $architecture == aarch64 ]] || fail "patched Hyprland supports only aarch64"
 [[ $(uname -m) == aarch64 ]] || fail "patched Hyprland must be built natively on aarch64"
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "invalid Hyprland version: $version"
-[[ $pkgrel == 3.2 ]] || fail "unexpected Hyprland package release: $pkgrel"
-[[ $upstream_package_version == "$version-3" ]] || fail "unexpected upstream Hyprland package version"
+[[ $pkgrel == 4.1 ]] || fail "unexpected Hyprland package release: $pkgrel"
+[[ $upstream_package_version == "$version-4" ]] || fail "unexpected upstream Hyprland package version"
 [[ $repository == https://github.com/hyprwm/Hyprland ]] || fail "unexpected Hyprland repository"
 [[ $url == "$repository/releases/download/v$version/source-v$version.tar.gz" ]] ||
   fail "Hyprland URL does not match the pinned release"

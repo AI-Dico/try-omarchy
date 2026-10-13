@@ -93,7 +93,7 @@ class LocaleScriptTests(unittest.TestCase):
             )
 
     def test_each_allowlisted_locale_writes_the_matching_lang_line(self) -> None:
-        for locale in ("en_US.UTF-8", "zh_TW.UTF-8", "zh_CN.UTF-8", "ko_KR.UTF-8"):
+        for locale in ("en_US.UTF-8", "zh_TW.UTF-8", "zh_CN.UTF-8", "ko_KR.UTF-8", "ja_JP.UTF-8"):
             result, locale_conf, temporary = self.run_script(
                 f"root=/dev/vda rw tryomarchy.locale={locale}"
             )

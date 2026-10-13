@@ -1010,6 +1010,7 @@ struct SavedGuestLanguageSupportTests {
         var result = metrics
         result.supportsLanguageSelection = true
         result.supportsKorean = true
+        result.supportsJapanese = true
         return result
     }
 
@@ -1021,7 +1022,10 @@ struct SavedGuestLanguageSupportTests {
         #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics))
         #expect(!QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: metrics))
         #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics, requiresKorean: true))
+        #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics, requiresJapanese: true))
         var olderMetrics = supportedMetrics
+        olderMetrics.supportsJapanese = false
+        #expect(!QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: olderMetrics, requiresJapanese: true))
         olderMetrics.supportsKorean = false
         #expect(!QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: olderMetrics, requiresKorean: true))
     }
@@ -1043,23 +1047,28 @@ struct SavedGuestLanguageSupportTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         }
         let commandLine = kit.appendingPathComponent("command-line")
-        for (line, expected, korean) in [
-            ("root=/dev/vda rw", false, false),
-            ("root=/dev/vda rw tryomarchy.locale_support=1", false, false),
-            ("root=/dev/vda rw tryomarchy.locale_support=20", false, false),
-            ("root=/dev/vda rw tryomarchy.locale_support=30", false, false),
-            ("root=/dev/vda rw tryomarchy.locale_support=2\n", true, false),
-            ("root=/dev/vda rw tryomarchy.locale_support=3\n", true, true),
+        for (line, expected, korean, japanese) in [
+            ("root=/dev/vda rw", false, false, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=1", false, false, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=20", false, false, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=30", false, false, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=2\n", true, false, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=3\n", true, true, false),
+            ("root=/dev/vda rw tryomarchy.locale_support=4\n", true, true, true),
+            ("root=/dev/vda rw tryomarchy.locale_support=40", false, false, false),
         ] {
             try Data(line.utf8).write(to: commandLine)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: commandLine.path)
             #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics) == expected)
             #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics, requiresKorean: true) == korean)
+            #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: environment, metrics: supportedMetrics, requiresJapanese: true) == japanese)
         }
+        try Data("tryomarchy.locale_support=4\n".utf8).write(to: commandLine)
         // A custom storage preference must select the same VM, too.
         let preference = StorageLocationPreference(containerPath: root.path)
         #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: [:], metrics: supportedMetrics, preference: preference))
         #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: [:], metrics: supportedMetrics, preference: preference, requiresKorean: true))
+        #expect(QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(environment: [:], metrics: supportedMetrics, preference: preference, requiresJapanese: true))
         try FileManager.default.removeItem(at: commandLine)
         let target = root.appendingPathComponent("untrusted-command-line")
         try Data("tryomarchy.locale_support=3\n".utf8).write(to: target)

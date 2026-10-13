@@ -378,7 +378,7 @@ if spec_profile != "factory" or manifest_profile != spec_profile:
 profile_contract = {
     "filesystemLabel": "omarchy-factory",
     "filesystemUuid": "89054943-1f4e-4f14-b934-d6db3fba4254",
-    "sizeMiB": 6144,
+    "sizeMiB": 7168,
     "hostname": "omarchy-factory",
     "username": None,
     "uid": None,
@@ -654,7 +654,7 @@ exact_keys(
 hyprland_identity = hashlib.sha256(
     json.dumps(hyprland, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
-if hyprland_identity != "b89f798d6d872313918628dd4c26b37a8fe8d12d8950bd7b25150e29f96800b3":
+if hyprland_identity != "eccc7e589d236fe77345918267fd2133535700aeb44b3a435493786b9e9cf729":
     fail("factory Hyprland component is not the reviewed rounded-border build")
 mise = exact_keys(
     supply_chain.get("mise"),
@@ -704,11 +704,11 @@ if ttfx != {
     "url": "https://github.com/omacom-io/ttfx/archive/refs/tags/v0.3.2.tar.gz",
     "sha256": "d0c0df4867e7f03142fb7f77c66670d0e8da15534239c1a7abfd89f19dfc00f6",
     "cargoLockSha256": "49e2091962fc4d425b4cf3bde1a105719b5b50eed0583ec90e85922adb45e2ce",
-    "binarySha256": "d034cc5b9a8d410ce93113ef0a5d27b5ee2327948562bf2b0e756eebd326fa8f",
+    "binarySha256": "b4e437f9436df5dfdc897662c73d143f9cc002520b409b07c3d7808011008af6",
     "target": "aarch64-unknown-linux-gnu",
-    "rustPackageVersion": "rust 1:1.98.1-1",
-    "rustcVersion": "rustc 1.98.1 (48a229cea 2026-09-01) (Arch Linux rust 1:1.98.1-1)",
-    "cargoVersion": "cargo 1.98.1 (797e8a9bc 2026-08-05) (Arch Linux rust 1:1.98.1-1)",
+    "rustPackageVersion": "rust 1:1.99.0-1",
+    "rustcVersion": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)",
+    "cargoVersion": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
     "reportedVersion": "ttfx 0.3.2",
     "license": "MIT",
     "licenseSha256": "175441de2eb9a0d3f0627c404ad71929336fd98d75926cc27b9e364d35cc7977",
@@ -1152,7 +1152,7 @@ guest_locale=${OMARCHY_QEMU_GPU_LOCALE:-}
 locale_kernel_argument=""
 if [[ -n $guest_locale ]]; then
   case $guest_locale in
-    en_US.UTF-8 | zh_TW.UTF-8 | zh_CN.UTF-8 | ko_KR.UTF-8)
+    en_US.UTF-8 | zh_TW.UTF-8 | zh_CN.UTF-8 | ko_KR.UTF-8 | ja_JP.UTF-8)
       locale_kernel_argument=" tryomarchy.locale=$guest_locale"
       ;;
     *)
@@ -1604,9 +1604,15 @@ fi
 # A saved disk owns its capability. Never apply a newer app's locale to an
 # older guest; mask the legacy every-boot writer so in-guest edits survive.
 case " $launch_kernel_command_line " in
-  *' tryomarchy.locale_support=3 '*) ;;
+  *' tryomarchy.locale_support=4 '*) ;;
+  *' tryomarchy.locale_support=3 '*)
+    if [[ $guest_locale == ja_JP.UTF-8 ]]; then
+      locale_kernel_argument=" tryomarchy.locale=en_US.UTF-8"
+    fi
+    ;;
   *' tryomarchy.locale_support=2 '*)
-    if [[ $guest_locale == ko_KR.UTF-8 ]]; then
+    # These factories generated English and Chinese only.
+    if [[ $guest_locale == ja_JP.UTF-8 || $guest_locale == ko_KR.UTF-8 ]]; then
       locale_kernel_argument=" tryomarchy.locale=en_US.UTF-8"
     fi
     ;;

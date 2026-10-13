@@ -404,6 +404,11 @@ def main() -> None:
         if line.strip() and not line.lstrip().startswith("#")
     }
     check(
+        {"fcitx5-mozc", "fcitx5-configtool"} <= requested_packages
+        and {"fcitx5-mozc", "fcitx5-configtool"} <= packages.keys(),
+        "Japanese conversion and input settings explicitly request and lock ARM64 packages",
+    )
+    check(
         "openssh" in requested_packages and "openssh" in packages,
         "SSH access explicitly requests and locks OpenSSH",
     )
@@ -547,11 +552,11 @@ def main() -> None:
             "url": "https://github.com/omacom-io/ttfx/archive/refs/tags/v0.3.2.tar.gz",
             "sha256": "d0c0df4867e7f03142fb7f77c66670d0e8da15534239c1a7abfd89f19dfc00f6",
             "cargoLockSha256": "49e2091962fc4d425b4cf3bde1a105719b5b50eed0583ec90e85922adb45e2ce",
-            "binarySha256": "d034cc5b9a8d410ce93113ef0a5d27b5ee2327948562bf2b0e756eebd326fa8f",
+            "binarySha256": "b4e437f9436df5dfdc897662c73d143f9cc002520b409b07c3d7808011008af6",
             "target": "aarch64-unknown-linux-gnu",
-            "rustPackageVersion": "rust 1:1.98.1-1",
-            "rustcVersion": "rustc 1.98.1 (48a229cea 2026-09-01) (Arch Linux rust 1:1.98.1-1)",
-            "cargoVersion": "cargo 1.98.1 (797e8a9bc 2026-08-05) (Arch Linux rust 1:1.98.1-1)",
+            "rustPackageVersion": "rust 1:1.99.0-1",
+            "rustcVersion": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)",
+            "cargoVersion": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
             "reportedVersion": "ttfx 0.3.2",
             "license": "MIT",
             "licenseSha256": "175441de2eb9a0d3f0627c404ad71929336fd98d75926cc27b9e364d35cc7977",
@@ -564,13 +569,13 @@ def main() -> None:
         hyprland
         == {
             "version": "0.56.2",
-            "pkgrel": "3.2",
-            "upstreamPackageVersion": "0.56.2-3",
+            "pkgrel": "4.1",
+            "upstreamPackageVersion": "0.56.2-4",
             "repository": "https://github.com/hyprwm/Hyprland",
             "commit": "efb50993780079460b0cbed1363e2166a2de1d9f",
             "url": "https://github.com/hyprwm/Hyprland/releases/download/v0.56.2/source-v0.56.2.tar.gz",
             "sha256": "03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e",
-            "upstreamPackageSha256": "dba57b0cba04557b7fa3478253c93fe4c8e88737f8dd570c0820177f567e5a95",
+            "upstreamPackageSha256": "4183f5212200625c278eefbbf70c912f1e8803df7ed99a8a2988beb4f4c74e04",
             "patch": "patches/hyprland/rounded-border-coverage.patch",
             "patchSha256": "5da431cbca37bdd9a66edeb77c3d677b7033d5f91449158e3ffa58a4eb515828",
             "glazeVersion": "7.2.0",
@@ -578,24 +583,24 @@ def main() -> None:
             "glazeUrl": "https://github.com/stephenberry/glaze/archive/refs/tags/v7.2.0.tar.gz",
             "glazeSha256": "17dba19ae63ae48f94994f00d49d5cb3c8f1306db1046c534c4828662490b7d4",
             "glazeLicenseSha256": "5d49e66411a0807a7c8d6b911b9a26b59e940c71aebe561a3ad8b0b80ac4b7b6",
-            "binarySha256": "32bd58fd20883240eb7f1d85da0e7f64b1582c8ea3c18c947d98bc219964019d",
+            "binarySha256": "8f873f7410063c979545e4b4a6d75dcbe01abc0665fe1dda9228312508dcdad1",
             "license": "BSD-3-Clause",
             "issue": "https://github.com/omacom/try-omarchy/issues/5",
             "buildPackages": {
                 "base-devel": "1-2",
                 "binutils": "2.46+r70+g155188ea10a7-1",
-                "cmake": "4.4.3-2",
+                "cmake": "4.4.4-1",
                 "gcc": "16.1.1+r12+g301eb08fa2c5-1",
                 "gcc-libs": "16.1.1+r12+g301eb08fa2c5-1",
                 "glibc": "2.43+r22+g8362e8ce10b2-2",
-                "hyprland": "0.56.2-3",
+                "hyprland": "0.56.2-4",
                 "hyprland-protocols": "0.7.1-1",
                 "hyprwayland-scanner": "0.4.6-1",
                 "make": "4.4.1-3",
-                "meson": "1.12.1-1",
+                "meson": "1.12.1-2",
                 "ninja": "1.13.2-3",
                 "pkgconf": "3.0.7-1",
-                "xorgproto": "2025.1-1",
+                "xorgproto": "2026.1-1",
             },
         }
         and packages.get("hyprland") == hyprland["upstreamPackageVersion"],
@@ -687,7 +692,7 @@ def main() -> None:
     check("try-omarchy-guest-work" in container, "guest cache has a project-scoped Docker volume")
     containerfile = read(GUEST / "Containerfile")
     check(
-        "arch-install-scripts e2fsprogs git python rust=1:1.98.1-1 zstd" in containerfile,
+        "arch-install-scripts e2fsprogs git python rust=1:1.99.0-1 zstd" in containerfile,
         "guest builder pins Rust for source-built components",
     )
 
@@ -703,8 +708,8 @@ def main() -> None:
     )
     check(
         'kb_model = "applealu_" .. geometry' in apple_keyboard
-        and "kb_layout" not in apple_keyboard
-        and "kb_variant" not in apple_keyboard
+        and "kb_layout =" not in apple_keyboard
+        and "kb_variant =" not in apple_keyboard
         and 'dofile("/usr/share/try-omarchy/apple-keyboard-input.lua")' in materialize,
         "skel input loads Apple keyboard geometry without overriding layout",
     )
@@ -724,8 +729,8 @@ def main() -> None:
     )
     check(
         "en_US.UTF-8 UTF-8" in configure and "zh_TW.UTF-8 UTF-8" in configure
-        and "zh_CN.UTF-8 UTF-8" in configure and "ko_KR.UTF-8 UTF-8" in configure,
-        "both Chinese locales and Korean are generated alongside English for host-language initialization",
+        and "zh_CN.UTF-8 UTF-8" in configure and "ko_KR.UTF-8 UTF-8" in configure and "ja_JP.UTF-8 UTF-8" in configure,
+        "Chinese, Korean, and Japanese locales are generated alongside English for host-language initialization",
     )
     check(
         "LANG=en_US.UTF-8" in configure and "KEYMAP=us" in configure,
@@ -750,14 +755,14 @@ def main() -> None:
     fcitx5_profile = read(GUEST / "fragments/fcitx5-profile.ini")
     check(
         "[Groups/0/Items/0]\nName=keyboard-us" in fcitx5_profile
-        and "[Groups/0/Items/1]\nName=chewing" in fcitx5_profile,
+        and "[Groups/0/Items/1]\nName=chewing" in fcitx5_profile
+        and "[Groups/0/Items/2]\nName=mozc" in fcitx5_profile,
         "keyboard-us sits at item index 0 ahead of chewing, so a user who never triggers the IME "
         "(an inactive input context) still lands on plain US input, even though fcitx5 resolves "
         "and rewrites the group's actual default input method to chewing",
     )
     check(
-        "[Groups/0/Items/2]" not in fcitx5_profile
-        and "[Groups/1/Items/2]" not in fcitx5_profile
+        "[Groups/1/Items/2]" not in fcitx5_profile
         and "[Groups/1]\nName=Korean\nDefault Layout=us\nDefaultIM=hangul\n" in fcitx5_profile
         and "[Groups/1/Items/0]\nName=keyboard-us\nLayout=\n" in fcitx5_profile
         and "[Groups/1/Items/1]\nName=hangul\nLayout=\n" in fcitx5_profile
@@ -766,7 +771,7 @@ def main() -> None:
         and "fcitx5-hangul" in packages
         and "libhangul" in packages,
         "Hangul lives in its own Korean group (US + Hangul) after Default, so the Default "
-        "group stays US + Chewing, and the hangul engine and its libhangul dependency are "
+        "group stays US + Chewing + Mozc, and the hangul engine and its libhangul dependency are "
         "part of the locked transaction",
     )
     check(
@@ -1355,14 +1360,14 @@ def main() -> None:
         locale_gen_format is not None
         and locale_allowlist_match is not None
         and generated_locales == allowlisted_locales
-        and "ko_KR.UTF-8" in allowlisted_locales,
+        and "ko_KR.UTF-8" in allowlisted_locales and "ja_JP.UTF-8" in allowlisted_locales,
         "locale script's allowlist cannot drift from the locales configure-rootfs.sh actually "
         "generates, or a chosen language silently gets no LANG",
     )
     check(
         [token for token in spec["runtime"]["kernelCommandLine"].split()
-         if token.startswith("tryomarchy.locale_support=")] == ["tryomarchy.locale_support=3"],
-        "the factory advertises locale support 3 for English, both Chinese locales, and Korean",
+         if token.startswith("tryomarchy.locale_support=")] == ["tryomarchy.locale_support=4"],
+        "the factory advertises locale support 4 for English, both Chinese locales, Korean, and Japanese",
     )
     check(
         locale_script_path.is_file()

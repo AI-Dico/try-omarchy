@@ -91,6 +91,7 @@ chmod 0755 \
   "$root/usr/local/bin/omarchy-native-mac-share" \
   "$root/usr/local/bin/try-omarchy-touch-id" \
   "$root/usr/local/bin/try-omarchy-touch-id-test" \
+  "$root/usr/local/bin/try-omarchy-input-init" \
   "$root/usr/local/lib/try-omarchy/native-authentication-broker" \
   "$root/usr/local/sbin/try-omarchy-touch-id-control" \
   "$root/usr/local/sbin/try-omarchy-migrate-alacritty" \
@@ -145,8 +146,8 @@ cat >"$root/etc/hosts" <<EOF
 127.0.1.1 $hostname
 EOF
 # First boot seeds LANG from the Mac's primary language. English is the
-# fallback; both Chinese scripts are available. Keyboard input is independent.
-printf 'en_US.UTF-8 UTF-8\nzh_TW.UTF-8 UTF-8\nzh_CN.UTF-8 UTF-8\nko_KR.UTF-8 UTF-8\n' >"$root/etc/locale.gen"
+# fallback; Chinese, Korean, and Japanese are available. Keyboard input is independent.
+printf 'en_US.UTF-8 UTF-8\nzh_TW.UTF-8 UTF-8\nzh_CN.UTF-8 UTF-8\nko_KR.UTF-8 UTF-8\nja_JP.UTF-8 UTF-8\n' >"$root/etc/locale.gen"
 printf 'LANG=en_US.UTF-8\n' >"$root/etc/locale.conf"
 printf 'KEYMAP=us\n' >"$root/etc/vconsole.conf"
 # Only a fresh factory contains this marker. Successful initialization removes
@@ -187,6 +188,10 @@ fcitx5_profile="$guest_dir/fragments/fcitx5-profile.ini"
 install -d -m 0755 "$root/etc/skel/.config/fcitx5"
 install -m 0644 "$fcitx5_profile" \
   "$root/etc/skel/.config/fcitx5/profile"
+install -m 0644 "$fcitx5_profile" \
+  "$root/usr/share/try-omarchy/fcitx5-profile.ini"
+install -m 0644 "$guest_dir/fragments/fcitx5-jis-config.ini" \
+  "$root/usr/share/try-omarchy/fcitx5-jis-config.ini"
 
 # Chromium's Ozone/Wayland backend drops input-method text unless launched
 # with --enable-wayland-ime, so fcitx5 can't reach it otherwise. Basecamp's

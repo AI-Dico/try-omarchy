@@ -20,6 +20,9 @@ New users load `/usr/share/try-omarchy/apple-keyboard-input.lua`, which
 sets only `kb_model = "applealu_" .. geometry`. Layout and variant stay
 whatever Omarchy setup chose. A missing token is a no-op.
 
+Japanese setup preselects the Japanese layout on JIS Macs. Mozc and native
+英数/かな mode keys are described in [Japanese input](japanese-input.md).
+
 ## Existing VMs
 
 App upgrade applies the Cocoa ISO keycode swap immediately. That uninverts

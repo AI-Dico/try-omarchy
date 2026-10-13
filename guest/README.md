@@ -215,3 +215,12 @@ It never forces a shutdown on a timer. **Shut Down** returns to the
 native settings window without automatic startup so location and reset remain
 accessible. A normal Linux reboot keeps the current QEMU process and therefore
 does not apply these launch settings.
+
+## Japanese input
+
+The factory includes Fcitx5/Mozc, configuration tools, and CJK fonts. JIS Macs
+preselect Japanese during owner setup and seed native 英数/かな mode keys.
+Japanese initial language also selects Mozc on ANSI/ISO keyboards while keeping
+the owner's keyboard layout. Existing guests keep their packages and personal
+input settings; see [Japanese input](../docs/japanese-input.md) for setup and
+runtime validation.

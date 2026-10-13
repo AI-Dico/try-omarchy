@@ -239,11 +239,11 @@ creates the account on first boot.
 - New guests seed their locale once from the Mac's primary preferred language.
   The launcher maps English (and unsupported languages) to `en_US.UTF-8`,
   Traditional Chinese to `zh_TW.UTF-8`, Simplified Chinese to `zh_CN.UTF-8`,
-  and Korean to `ko_KR.UTF-8`. All four are generated in the factory. The selected
-  disk's saved boot kit must advertise `tryomarchy.locale_support=3` for Korean;
-  `tryomarchy.locale_support=2` keeps the English/Chinese mapping and falls back
-  to English for a Korean Mac. Both versions accept a `tryomarchy.locale` hint.
-  A guest oneshot consumes the factory-only
+  Korean to `ko_KR.UTF-8`, and Japanese to `ja_JP.UTF-8`. All five are generated
+  in the factory. The selected disk's saved boot kit advertises
+  `tryomarchy.locale_support=4` for Japanese, `3` for Korean, and `2` for
+  English/Chinese. Older factories fall back to English for unsupported host
+  languages. A guest oneshot consumes the factory-only
   `/var/lib/try-omarchy/locale-pending` marker after writing `LANG` to
   `/etc/locale.conf`, before owner provisioning or login starts. Other locale
   categories, comments, and file permissions are preserved. Subsequent boots
@@ -252,17 +252,17 @@ creates the account on first boot.
   the launcher masks their legacy every-boot locale writer for that boot.
   Older disks without a locale capability receive no hint. Launcher language
   preferences from earlier app versions are no longer read.
-  fcitx5 is seeded with a Default group of US and Chewing (Bopomofo) and a
-  separate Korean group of US and Hangul. Only `ko_KR.UTF-8` initialization
-  moves Korean first in `/etc/skel/.config/fcitx5/profile`, and only when its
-  GroupOrder is still the factory's `0=Default` / `1=Korean`. The locale unit
-  runs `Before=omarchy-provision-owner.service`, which creates the owner account
-  from `/etc/skel`. Other locales and customized group orders are unchanged.
-  `Ctrl + Space` toggles US and Hangul in the Korean group. Users can switch
-  groups with `fcitx5-remote -g Korean` or `fcitx5-remote -g Default`. The fontconfig rule
-  prefers Traditional Chinese Han variants for `zh-TW`/`zh-Hant` text and
-  Noto CJK KR variants for Korean text. Chromium receives the Wayland IME flag
-  needed for fcitx5.
+  Fcitx5 includes a Default group with US, Chewing (Bopomofo), and Mozc, and a
+  separate Korean group with US and Hangul. Korean locale initialization moves
+  Korean first only when the factory GroupOrder is untouched. It runs before
+  owner provisioning copies `/etc/skel`. A JIS host or Japanese initial language
+  seeds Mozc as the first conversion engine only for untouched factory profiles;
+  JIS mode keys use native Fcitx hotkeys. Other groups and custom settings are
+  preserved. Ctrl+Space toggles the selected group's input method. Users can
+  switch groups with `fcitx5-remote -g Korean` or `fcitx5-remote -g Default`.
+  Fontconfig prefers Traditional Chinese Han variants for `zh-TW`/`zh-Hant`
+  text and Noto CJK KR variants for Korean text. Chromium receives the Wayland
+  IME flag needed for Fcitx5. See [Japanese input](japanese-input.md).
 
 When no VM exists, launch decompresses the compressed factory directly into its
 unpublished writable disk, verifies its expanded size and digest, and publishes it

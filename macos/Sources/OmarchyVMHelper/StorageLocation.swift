@@ -63,6 +63,7 @@ struct BundledGuestMetrics: Equatable {
     var workingDiskBytes: Int64
     var supportsLanguageSelection: Bool = false
     var supportsKorean: Bool = false
+    var supportsJapanese: Bool = false
 }
 
 /// How much room the workspace needs on the chosen volume.

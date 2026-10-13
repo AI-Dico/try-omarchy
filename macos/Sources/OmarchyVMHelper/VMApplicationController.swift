@@ -665,7 +665,8 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
         let language = LanguageLaunchConfiguration.make(
             baseEnvironment: resources.environment,
             supportsSelection: supportsLanguageSelection(),
-            supportsKorean: supportsLanguageSelection(requiresKorean: true)
+            supportsKorean: supportsLanguageSelection(requiresKorean: true),
+            supportsJapanese: supportsLanguageSelection(requiresJapanese: true)
         )
         var storageEnvironment = language.environment
         if let directory = disposableWorkspace.directory {
@@ -913,15 +914,17 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func supportsLanguageSelection(requiresKorean: Bool = false) -> Bool {
+    private func supportsLanguageSelection(requiresKorean: Bool = false, requiresJapanese: Bool = false) -> Bool {
         if initialArguments.first == QEMUGPUStorageOption.ephemeral.rawValue {
+            if requiresJapanese { return bundledMetrics?.supportsJapanese ?? false }
             return (requiresKorean ? bundledMetrics?.supportsKorean : bundledMetrics?.supportsLanguageSelection) ?? false
         }
         return QEMUGPUStorageSpaceEstimate.supportsLanguageSelection(
             environment: baseEnvironment,
             metrics: bundledMetrics,
             preference: storageLocationStore.load(),
-            requiresKorean: requiresKorean
+            requiresKorean: requiresKorean,
+            requiresJapanese: requiresJapanese
         )
     }
 

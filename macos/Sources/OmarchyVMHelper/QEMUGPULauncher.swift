@@ -235,12 +235,14 @@ enum QEMUGPUStorageSpaceEstimate {
         metrics: BundledGuestMetrics?,
         preference: StorageLocationPreference = .default,
         requiresKorean: Bool = false,
+        requiresJapanese: Bool = false,
         fileManager: FileManager = .default
     ) -> Bool {
         guard let metrics,
               let root = storageRootURL(environment: environment, preference: preference, fileManager: fileManager)
         else { return false }
-        let factorySupportsSelection = requiresKorean ? metrics.supportsKorean : metrics.supportsLanguageSelection
+        let factorySupportsSelection = requiresJapanese ? metrics.supportsJapanese
+            : (requiresKorean ? metrics.supportsKorean : metrics.supportsLanguageSelection)
         let disks = root.appendingPathComponent("disks", isDirectory: true)
         if !fileManager.fileExists(atPath: disks.path) {
             return factorySupportsSelection
@@ -269,7 +271,7 @@ enum QEMUGPUStorageSpaceEstimate {
               size <= 16385,
               let contents = try? String(contentsOf: commandLine, encoding: .utf8)
         else { return false }
-        return GuestLocaleCatalog.supportsSelection(kernelCommandLine: contents, requiresKorean: requiresKorean)
+        return GuestLocaleCatalog.supportsSelection(kernelCommandLine: contents, requiresKorean: requiresKorean, requiresJapanese: requiresJapanese)
     }
 
     /// Read-only best-effort preflight for the one-time legacy boot-file
@@ -366,6 +368,9 @@ enum QEMUGPUStorageSpaceEstimate {
             ),
             supportsKorean: GuestLocaleCatalog.supportsSelection(
                 kernelCommandLine: dictionary["kernelCommandLine"] as? String ?? "", requiresKorean: true
+            ),
+            supportsJapanese: GuestLocaleCatalog.supportsSelection(
+                kernelCommandLine: dictionary["kernelCommandLine"] as? String ?? "", requiresJapanese: true
             )
         )
     }

@@ -32,7 +32,7 @@ for argument in $command_line; do
       # reads on every login, so anything else is ignored (keeping whatever
       # is already selected) rather than trusted or shell-interpolated.
       case $candidate in
-        en_US.UTF-8 | zh_TW.UTF-8 | zh_CN.UTF-8 | ko_KR.UTF-8) locale=$candidate ;;
+        en_US.UTF-8 | zh_TW.UTF-8 | zh_CN.UTF-8 | ko_KR.UTF-8 | ja_JP.UTF-8) locale=$candidate ;;
       esac
       ;;
   esac

@@ -42,6 +42,27 @@ class AppleKeyboardInputTests(unittest.TestCase):
             model = completed.stdout or None
             self.assertEqual(model, expected, cmdline)
 
+    def test_jis_backslash_preserves_other_options_and_owner_choices(self) -> None:
+        lua = shutil.which("lua") or shutil.which("lua5.4") or shutil.which("luajit")
+        if lua is None:
+            self.skipTest("lua required")
+        for geometry, layout, variant, options, keymap, expected in (
+            ("jis", "jp", "", "", "", "apple:jp_oadg109a"),
+            ("jis", "jp", "", "compose:caps", "", "compose:caps,apple:jp_oadg109a"),
+            ("jis", "jp", "", "apple:jp_oadg109a", "", "<preserved>"),
+            ("jis", "jp", "", "apple:jp_pc106", "", "<preserved>"),
+            ("jis", "us", "", "", "", "<preserved>"),
+            ("jis", "jp,us", "", "", "", "<preserved>"),
+            ("jis", "jp", "kana", "", "", "<preserved>"),
+            ("jis", "jp", "", "", "/custom.xkb", "<preserved>"),
+            ("ansi", "jp", "", "", "", "<preserved>"),
+        ):
+            result = subprocess.run(
+                [lua, str(HARNESS), "tryomarchy.keyboard=" + geometry, str(LUA), layout, variant, options, keymap],
+                check=True, capture_output=True, text=True,
+            )
+            self.assertEqual(result.stdout, "applealu_" + geometry + "|" + expected)
+
 
 if __name__ == "__main__":
     unittest.main()

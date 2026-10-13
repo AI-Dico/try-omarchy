@@ -930,6 +930,14 @@ for locale in en_US.UTF-8 zh_TW.UTF-8 zh_CN.UTF-8 ko_KR.UTF-8; do
   run_scenario "locale-v3-$locale" 0 '' "OMARCHY_QEMU_GPU_LOCALE=$locale"
   assert_contains "$(<"$test_root/locale-v3-$locale/qemu.log")" "tryomarchy.locale=$locale"
 done
+run_scenario locale-japanese-v3 0 '' OMARCHY_QEMU_GPU_LOCALE=ja_JP.UTF-8
+assert_contains "$(<"$test_root/locale-japanese-v3/qemu.log")" 'tryomarchy.locale=en_US.UTF-8'
+assert_not_contains "$(<"$test_root/locale-japanese-v3/qemu.log")" 'tryomarchy.locale=ja_JP.UTF-8'
+printf '%s tryomarchy.locale_support=4\n' "$saved_command_line" >"$persistent_root/boot/command-line"
+for locale in en_US.UTF-8 zh_TW.UTF-8 zh_CN.UTF-8 ko_KR.UTF-8 ja_JP.UTF-8; do
+  run_scenario "locale-v4-$locale" 0 '' "OMARCHY_QEMU_GPU_LOCALE=$locale"
+  assert_contains "$(<"$test_root/locale-v4-$locale/qemu.log")" "tryomarchy.locale=$locale"
+done
 run_scenario locale-invalid 1 '' OMARCHY_QEMU_GPU_LOCALE=fr_FR.UTF-8
 assert_contains "$(<"$test_root/locale-invalid/stderr")" 'unsupported guest locale'
 run_scenario locale-default 0 '' OMARCHY_QEMU_GPU_LOCALE=

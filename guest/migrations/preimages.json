@@ -84,6 +84,9 @@
     "fe333bdccba74a4817d2b8e7180f4f37f8455bbb9019cb7db81481c3f64bbf9c",
     "039101852ca314042c7a28892554418ca7f067a174c4dea3bdc453182bbde28c"
   ],
+  "usr/local/share/try-omarchy/ghostty/build-spec.json": [
+    "65d6f593ec27e3173a19d151943620c575d8ea767b5b16a98db13f3a71ccb264"
+  ],
   "usr/src/try-omarchy-battery-1.2.0/Makefile": [
     "710a6269ca6dcad2b83608660a1f948347e34bd39ddac4ca614a2bd115ee43ae"
   ],

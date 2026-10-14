@@ -247,14 +247,15 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
             canResetStorage: canResetStorage,
             storageLocation: { [weak self] in
                 guard canResetStorage, let self else { return nil }
-                return QEMUGPUStorageSpaceEstimate.dataDirectoryDisplayPath(
+                guard let root = QEMUGPUStorageSpaceEstimate.storageRootURL(
                     environment: self.baseEnvironment,
                     preference: self.storageLocationStore.load()
-                )
+                ) else { return nil }
+                return StorageLocationPolicy.displayPath(root.path, homeDirectory: Self.homeDirectory)
             },
             storageLocationURL: { [weak self] in
                 guard canResetStorage, let self else { return nil }
-                return QEMUGPUStorageSpaceEstimate.dataDirectoryURL(
+                return QEMUGPUStorageSpaceEstimate.storageRootURL(
                     environment: self.baseEnvironment,
                     preference: self.storageLocationStore.load()
                 )
@@ -281,6 +282,12 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
             },
             resetStorage: { [weak self] in
                 self?.resetVirtualMachine()
+            },
+            deleteStorageLocation: { [weak self] source, identity, completion in
+                self?.deleteStorageLocation(source, identity: identity, completion: completion)
+            },
+            moveStorageLocation: { [weak self] source, path, progress, completion in
+                self?.moveStorageLocation(from: source, to: path, progress: progress, completion: completion)
             },
             sharedFolderStatus: { [weak self] in
                 self?.sharedFolderMenuState() ?? SharedFolderMenuState.disabled
@@ -551,6 +558,7 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if workspaceTransferProcess != nil { return .terminateCancel }
         guard childRunning else { return .terminateNow }
         guard !applicationTerminationPending else { return .terminateLater }
 
@@ -562,6 +570,7 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
     }
 
     func handleTerminationSignal(_ signal: Int32) {
+        if workspaceTransferProcess?.isRunning == true { workspaceTransferProcess?.terminate() }
         guard !applicationTerminationPending else { return }
         cancelHostWakeRetry()
         lifecycle.requestTermination(signal: signal)
@@ -955,8 +964,7 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
     }
 
     /// Returns an error message when the folder is rejected; otherwise stores
-    /// it. The existing VM is deliberately left where it is: copying tens of
-    /// gigabytes across volumes cannot use cloning and would be interruptible.
+    /// it. Selecting a location never copies or replaces a VM.
     private func chooseStorageLocation(_ path: String) -> String? {
         do {
             let resolution = try StorageLocationPolicy.validate(
@@ -971,6 +979,80 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
             return nil
         } catch {
             return error.localizedDescription
+        }
+    }
+
+    private var workspaceTransferProcess: Process?
+
+    private func moveStorageLocation(from source: String, to path: String,
+        progress: @escaping (VMTransferProgress) -> Void, completion: @escaping (String?) -> Void) {
+        guard !childRunning, storageEnvironmentOverride == nil,
+              let root = startupPreferenceRoot(), root.path == source,
+              let executable = Bundle.main.executableURL else {
+            completion("Shut down Omarchy before relocating its VM. Environment overrides must be removed first.")
+            return
+        }
+        // A separate process owns POSIX locks, so unrelated UI file reads
+        // cannot release them. Preferences change only after verified success.
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = ["--copy-vm", root.path, path]
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        do { try process.run() }
+        catch { completion(error.localizedDescription); return }
+        workspaceTransferProcess = process
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let errorMessage: String
+            do {
+                errorMessage = try VMTransferOutput.read(from: errors.fileHandleForReading) { update in
+                    DispatchQueue.main.async { progress(update) }
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                if process.isRunning { process.terminate() }
+            }
+            process.waitUntilExit()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.workspaceTransferProcess = nil
+                guard process.terminationStatus == 0 else {
+                    completion(errorMessage.isEmpty
+                        ? "VM relocation failed. The original VM and selected location were retained."
+                        : errorMessage)
+                    return
+                }
+                completion(self.chooseStorageLocation(path))
+            }
+        }
+    }
+
+    private func deleteStorageLocation(_ source: String, identity: String, completion: @escaping (String?) -> Void) {
+        guard !childRunning, workspaceTransferProcess == nil, storageEnvironmentOverride == nil,
+              startupPreferenceRoot()?.path == source, let executable = Bundle.main.executableURL else {
+            completion("Shut down Omarchy before deleting its VM. The selected VM must match the confirmed folder.")
+            return
+        }
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = ["--trash-vm", source, identity]
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        do { try process.run() }
+        catch { completion(error.localizedDescription); return }
+        workspaceTransferProcess = process
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let message: String
+            do { message = try VMTransferOutput.read(from: errors.fileHandleForReading) { _ in } }
+            catch { message = error.localizedDescription; if process.isRunning { process.terminate() } }
+            process.waitUntilExit()
+            DispatchQueue.main.async { [weak self] in
+                self?.workspaceTransferProcess = nil
+                completion(process.terminationStatus == 0 ? nil :
+                    (message.isEmpty ? "Could not move this VM to Trash. The selected folder was retained." : message))
+            }
         }
     }
 

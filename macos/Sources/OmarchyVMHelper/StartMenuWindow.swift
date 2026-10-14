@@ -25,43 +25,45 @@ enum OmarchyStartMenuTheme {
     }
 }
 
-enum ResetConfirmationPolicy {
+enum VMDestructiveConfirmationPolicy {
     static let requiredText = "Try Omarchy"
 
-    static func allowsReset(_ text: String) -> Bool {
+    static func allowsAction(_ text: String) -> Bool {
         text == requiredText
     }
 }
 
 @MainActor
-final class ResetConfirmationPrompt {
+final class VMDestructiveConfirmationPrompt {
     let alert: NSAlert
     let confirmationField: NSTextField
-    let resetButton: NSButton
+    let actionButton: NSButton
 
     private var textChangeObserver: NSObjectProtocol?
 
-    init(detail: String) {
+    enum Action: String { case reset, delete }
+
+    init(detail: String, action: Action = .reset) {
         let alert = NSAlert()
         alert.alertStyle = .critical
-        alert.messageText = "Reset Omarchy to factory settings?"
+        alert.messageText = action == .reset ? "Reset Omarchy to factory settings?" : "Delete the selected VM?"
         alert.informativeText = detail
         alert.addButton(withTitle: "Cancel")
-        let resetButton = alert.addButton(withTitle: "Reset")
-        resetButton.hasDestructiveAction = true
-        resetButton.isEnabled = false
+        let actionButton = alert.addButton(withTitle: action == .reset ? "Reset" : "Move to Trash")
+        actionButton.hasDestructiveAction = true
+        actionButton.isEnabled = false
 
         let instruction = NSTextField(
-            labelWithString: "Type \(ResetConfirmationPolicy.requiredText) to confirm"
+            labelWithString: "Type \(VMDestructiveConfirmationPolicy.requiredText) to confirm"
         )
         instruction.font = .systemFont(ofSize: 12, weight: .medium)
         instruction.translatesAutoresizingMaskIntoConstraints = false
 
         let confirmationField = NSTextField(string: "")
-        confirmationField.placeholderString = ResetConfirmationPolicy.requiredText
-        confirmationField.identifier = NSUserInterfaceItemIdentifier("reset-confirmation-field")
+        confirmationField.placeholderString = VMDestructiveConfirmationPolicy.requiredText
+        confirmationField.identifier = NSUserInterfaceItemIdentifier("\(action.rawValue)-confirmation-field")
         confirmationField.setAccessibilityLabel(
-            "Type \(ResetConfirmationPolicy.requiredText) to confirm reset"
+            "Type \(VMDestructiveConfirmationPolicy.requiredText) to confirm \(action.rawValue)"
         )
         confirmationField.translatesAutoresizingMaskIntoConstraints = false
 
@@ -81,13 +83,13 @@ final class ResetConfirmationPrompt {
 
         self.alert = alert
         self.confirmationField = confirmationField
-        self.resetButton = resetButton
+        self.actionButton = actionButton
         textChangeObserver = NotificationCenter.default.addObserver(
             forName: NSControl.textDidChangeNotification,
             object: confirmationField,
             queue: .main
-        ) { [weak confirmationField, weak resetButton] _ in
-            resetButton?.isEnabled = ResetConfirmationPolicy.allowsReset(
+        ) { [weak confirmationField, weak actionButton] _ in
+            actionButton?.isEnabled = VMDestructiveConfirmationPolicy.allowsAction(
                 confirmationField?.stringValue ?? ""
             )
         }
@@ -106,7 +108,7 @@ final class ResetConfirmationPrompt {
                 return
             }
             let confirmed = response == .alertSecondButtonReturn
-                && ResetConfirmationPolicy.allowsReset(confirmationField.stringValue)
+                && VMDestructiveConfirmationPolicy.allowsAction(confirmationField.stringValue)
             completion(confirmed)
         }
         DispatchQueue.main.async { [weak window, weak confirmationField] in
@@ -193,10 +195,13 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
     private let storageLocationStatus: () -> StorageLocationMenuState
     private let validateStorageLocation: (String) -> String?
     private let chooseStorageLocation: (String) -> String?
+    private let deleteStorageLocation: VMStorageEditor.Delete
+    private let moveStorageLocation: VMStorageEditor.Move
     private let useDefaultStorageLocation: () -> Void
 
     private var microphoneRequestInFlight = false
     private var cameraRequestInFlight = false
+    private var storageMoveInProgress = false
     private var resetInProgress = false
     private var resetPhase = VMResetPhase.checking
     private weak var resetActionButton: OmarchyActionButton?
@@ -209,7 +214,7 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
     private var requestSettingsAction: ((VMRunLifecycle.SettingsAction) -> Void)?
     private var automaticStartupConfirmationInProgress = false
     private var controlsBusy: Bool {
-        launchInProgress || shutdownInProgress || automaticStartupConfirmationInProgress
+        launchInProgress || shutdownInProgress || automaticStartupConfirmationInProgress || storageMoveInProgress || storageEditor != nil
     }
     var onAppReleasePromptOpportunity: (() -> Void)?
     var canPresentAppReleasePrompt: Bool {
@@ -224,12 +229,13 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
     }
     private var prelaunchControlsLocked: Bool { controlsBusy || virtualMachineRunning }
     private var pendingResetSpaceEstimate: String?
-    private var resetConfirmationPrompt: ResetConfirmationPrompt?
+    private var resetConfirmationPrompt: VMDestructiveConfirmationPrompt?
     private weak var startMenuScrollView: NSScrollView?
     private var preferredContentHeight: CGFloat = 832
     private(set) var portForwardingEditor: PortForwardingEditor?
     private(set) var resourceEditor: VMResourceEditor?
     private(set) var usbDeviceEditor: USBDeviceEditor?
+    private(set) var storageEditor: VMStorageEditor?
     private weak var immersiveCaption: NSTextField?
     private var accessibilityRow: StartMenuPermissionRow?
     private var microphoneRow: StartMenuPermissionRow?
@@ -254,6 +260,8 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         chooseStorageLocation: @escaping (String) -> String?,
         useDefaultStorageLocation: @escaping () -> Void,
         resetStorage: @escaping () -> Void,
+        deleteStorageLocation: @escaping VMStorageEditor.Delete = { _, _, completion in completion("VM deletion is unavailable.") },
+        moveStorageLocation: @escaping VMStorageEditor.Move = { _, _, _, completion in completion("VM relocation is unavailable.") },
         sharedFolderStatus: @escaping () -> SharedFolderMenuState,
         chooseSharedFolder: @escaping (String) -> String?,
         setSharedFolderEnabled: @escaping (Bool) -> Void,
@@ -296,6 +304,8 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         self.storageLocationStatus = storageLocationStatus
         self.validateStorageLocation = validateStorageLocation
         self.chooseStorageLocation = chooseStorageLocation
+        self.deleteStorageLocation = deleteStorageLocation
+        self.moveStorageLocation = moveStorageLocation
         self.useDefaultStorageLocation = useDefaultStorageLocation
         self.resetStorage = resetStorage
         self.sharedFolderStatus = sharedFolderStatus
@@ -532,6 +542,8 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         portForwardingEditor = nil
         resourceEditor?.dismiss()
         resourceEditor = nil
+        storageEditor?.dismiss()
+        storageEditor = nil
         window.orderOut(nil)
     }
 
@@ -649,6 +661,7 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if storageMoveInProgress { return false }
         if virtualMachineRunning {
             closeSettings()
         } else {
@@ -848,23 +861,20 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
                 storageDetailLines = nil
             }
 
-            var storageActions: [(String, Selector)] = [("Change\u{2026}", #selector(beginStorageLocationSelection))]
-            if !storageStatus.isDefault {
-                storageActions.append(("Use Default", #selector(useDefaultStorageLocationAction)))
-            }
+            let storageActions: [(String, Selector)] = [("Manage…", #selector(showStorageActions(_:)))]
 
             storageRow = permissionRow(
                 symbolName: "externaldrive",
-                title: "VM Location",
-                detail: storageDetail,
-                compactDetailLines: storageDetailLines,
+                title: "Selected VM",
+                detail: storageMoveInProgress ? "Copying and verifying your VM… Original retained." : storageDetail,
+                compactDetailLines: storageMoveInProgress ? nil : storageDetailLines,
                 detailAction: storageStatus.problem == nil && storageLocationURL() != nil
                     ? #selector(openStorageLocation)
                     : nil,
                 granted: !storageStatus.isDefault && storageStatus.problem == nil,
                 statusLabels: ("\u{25cf}  Custom", "\u{25cb}  Default"),
                 actions: storageActions,
-                actionsEnabled: canResetStorage && !virtualMachineRunning && !storageStatus.isEnvironmentOverride,
+                actionsEnabled: canResetStorage && !prelaunchControlsLocked && !resetInProgress && !storageStatus.isEnvironmentOverride,
                 minimumHeight: storageDetailLines != nil || storageActions.count > 1 ? 90 : 68
             )
         }
@@ -939,7 +949,7 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
             && !prelaunchControlsLocked
             && !resetInProgress
         reset.toolTip = canResetStorage
-            ? "Erase this VM and return it to factory settings"
+            ? "Permanently erase this VM and create a fresh one in the same folder"
             : "Reset is unavailable for a disposable VM"
         reset.heightAnchor.constraint(equalToConstant: 30).isActive = true
         reset.widthAnchor.constraint(greaterThanOrEqualToConstant: 154).isActive = true
@@ -960,9 +970,9 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
             action: virtualMachineRunning ? #selector(closeSettings) : (fixesPending ? #selector(reviewVMFixes) : #selector(launchOmarchy))
         )
         launchActionButton = launchButton
-        launchButton.keyEquivalent = launchInProgress ? "" : "\r"
-        launchButton.isEnabled = virtualMachineRunning || (!launchInProgress
-            && !resetInProgress)
+        launchButton.keyEquivalent = launchInProgress || storageMoveInProgress ? "" : "\r"
+        launchButton.isEnabled = storageEditor == nil && !storageMoveInProgress && (virtualMachineRunning || (!launchInProgress
+            && !resetInProgress))
         launchButton.identifier = NSUserInterfaceItemIdentifier("launch-button")
         launchButton.setAccessibilityLabel(launchButtonTitle)
         if launchInProgress {
@@ -997,7 +1007,7 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         resetTitle.textColor = OmarchyStartMenuTheme.foreground
         let resetDetail = NSTextField(wrappingLabelWithString: virtualMachineRunning
             ? "Shut down Omarchy to change the VM location or reset it to factory settings."
-            : "Erase this VM and return it to factory settings.")
+            : "Permanently erase this VM. The next launch creates a fresh one in the same folder.")
         resetDetail.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         resetDetail.textColor = OmarchyStartMenuTheme.muted
         resetDetail.maximumNumberOfLines = 3
@@ -1572,65 +1582,39 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         confirmReset()
     }
 
-    @objc private func beginStorageLocationSelection() {
-        guard canResetStorage, !prelaunchControlsLocked, !resetInProgress else { return }
-        let panel = NSOpenPanel()
-        panel.title = "Choose where to keep the Omarchy VM"
-        panel.message = "Omarchy puts its VM files straight into the folder you choose \u{2014} it does not create a folder inside it. Pick an empty folder, or one Omarchy already uses. The drive must be APFS."
-        panel.prompt = "Use Folder"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.resolvesAliases = true
-        if let current = storageLocationStatus().containerPath {
-            panel.directoryURL = URL(fileURLWithPath: current, isDirectory: true)
-        } else {
-            panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        // Reject before confirming: nobody should agree to a move that is about
-        // to be refused because the drive is the wrong format or too full.
-        if let problem = validateStorageLocation(url.path) {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "That folder can\u{2019}t hold the Omarchy VM"
-            alert.informativeText = problem
-            alert.addButton(withTitle: "OK")
-            alert.beginSheetModal(for: window)
-            return
-        }
-
-        let destination = StorageLocationPolicy.stateRoot(forContainer: url.path)
-        let confirmation = NSAlert()
-        confirmation.alertStyle = .warning
-        confirmation.messageText = "Keep the Omarchy VM here?"
-        confirmation.informativeText = """
-            Omarchy will use \(destination) from the next launch.
-
-            Your current VM is not moved. It stays where it is, and you can \
-            reach it again by switching this setting back.
-            """
-        confirmation.addButton(withTitle: "Cancel")
-        confirmation.addButton(withTitle: "Use This Folder")
-        guard confirmation.runModal() == .alertSecondButtonReturn else { return }
-
-        if let problem = chooseStorageLocation(url.path) {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "That folder can\u{2019}t hold the Omarchy VM"
-            alert.informativeText = problem
-            alert.addButton(withTitle: "OK")
-            alert.beginSheetModal(for: window)
-        }
+    @objc private func showStorageActions(_ sender: NSButton) {
+        guard canResetStorage, !prelaunchControlsLocked, !resetInProgress,
+              !storageLocationStatus().isEnvironmentOverride, storageEditor == nil else { return }
+        let editor = VMStorageEditor(
+            selectedRoot: storageLocationURL,
+            isDefault: { [weak self] in self?.storageLocationStatus().isDefault ?? true },
+            validate: validateStorageLocation,
+            select: chooseStorageLocation,
+            useDefault: useDefaultStorageLocation,
+            move: { [weak self] source, destination, progress, completion in
+                guard let self else { completion("The launcher was closed."); return }
+                self.storageMoveInProgress = true
+                self.moveStorageLocation(source, destination, progress) { [weak self] error in
+                    self?.storageMoveInProgress = false
+                    completion(error)
+                }
+            },
+            delete: { [weak self] source, identity, completion in
+                guard let self else { completion("The launcher was closed."); return }
+                self.storageMoveInProgress = true
+                self.deleteStorageLocation(source, identity) { [weak self] error in
+                    self?.storageMoveInProgress = false
+                    completion(error)
+                }
+            },
+            didClose: { [weak self] in
+                self?.storageEditor = nil
+                self?.render()
+            }
+        )
+        storageEditor = editor
         render()
-    }
-
-    @objc private func useDefaultStorageLocationAction() {
-        guard canResetStorage, !prelaunchControlsLocked, !resetInProgress else { return }
-        useDefaultStorageLocation()
-        render()
+        editor.beginSheet(for: window)
     }
 
     @objc private func beginSharedFolderSelection() {
@@ -1807,7 +1791,7 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
         if let estimate {
             detail += " Resetting may free up to \(estimate) of disk space."
         }
-        let prompt = ResetConfirmationPrompt(detail: detail)
+        let prompt = VMDestructiveConfirmationPrompt(detail: detail)
         resetConfirmationPrompt = prompt
         prompt.present(for: window) { [weak self, weak prompt] confirmed in
             guard let self,

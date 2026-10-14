@@ -129,14 +129,33 @@ the reset. The next launch prepares a new disk if needed, with its button
 showing checking, image preparation, verification, setup, and startup phases.
 Phase changes come from the launcher process and are also announced to VoiceOver.
 
-The start menu can move that workspace to any APFS folder the user picks; the
-folder is used exactly as chosen, never with a folder created inside it — a
-folder with other files already in it, or a drive's top level, is refused
-instead of restructured. The choice is stored in `UserDefaults` and published
-to the launcher as `OMARCHY_QEMU_GPU_STATE_ROOT`. An inherited value of that
-variable still wins, so the development and test override keeps working
-unchanged. Reset composes its environment exactly as a launch does, so it
-always erases the workspace the user is actually running.
+The launcher's **Selected VM → Manage…** sheet shows the current selection,
+explains switching, moving, creating a separate VM, and deletion, and returns to the
+launcher with **Done**. Selection is saved immediately but does not start a
+VM. New selection requires an empty folder; existing selection requires a
+recognized persistent disk and workspace marker.
+
+Relocation runs `--copy-vm SOURCE EMPTY_DESTINATION` in a separate process,
+binds it to the source displayed in the sheet, holds the launcher's POSIX
+locks, stages a private sibling copy, and verifies every file with SHA-256
+before atomic publication. Structured stderr records report copy phases and
+actual hashed-byte verification progress. The sheet remains open, disables
+Done and selection while busy, and displays errors or the final selected and
+recovery paths inline. The original is retained; the preference changes only
+on success. APFS clones are used on the same volume, and sparse copying across
+volumes. Both locations must be local APFS folders. Symlinks, hard links,
+special files, occupied destinations, and changes during copying are refused.
+
+**Delete VM…** uses the same danger styling and typed `Try Omarchy` confirmation
+as Reset, and confirms the exact selected folder and moves its complete workspace
+into macOS Trash under the same launcher locks. It keeps other VM copies and
+refuses a running or changed VM. The folder remains selected, so choose another
+VM or an empty folder afterward. Trash errors never trigger permanent removal.
+
+The choice is stored in `UserDefaults` and published to the launcher as
+`OMARCHY_QEMU_GPU_STATE_ROOT`. An inherited value still wins and disables
+location changes in the launcher. Reset composes its environment exactly as launch
+does, so it always erases the workspace the user is actually running.
 
 **Skip launcher** is stored in the versioned `launcher-settings.json` file at
 that workspace's root (normally `~/Library/Application Support/Try Omarchy/VM/v1`).

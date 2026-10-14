@@ -328,8 +328,25 @@ disk sparsely and uses `cp -c` for uncompressed development sources. It
 serializes launches with a `lockf` advisory lock. On exFAT the same expansion allocates the full working size immediately,
 and on a network share the lock is unreliable. Both layers check independently, the app
 when the folder is chosen and the shell library again at launch, because the
-volume can change in between. A location change never moves the existing VM;
-unrecognized host files stay untouched, as everywhere else here.
+volume can change in between. The **Selected VM → Manage** sheet separates
+switching to an existing VM, moving the selected VM, and choosing an empty
+folder for a new VM. Choices apply to the next launch; Done returns to the
+launcher. Moving runs a separate native helper that locks the source with the launcher's POSIX record
+locks, clones or sparsely copies the full workspace to a private staging
+sibling, hashes every regular file, checks for source and destination changes,
+flushes files and directories, and atomically publishes the copy. Only success
+changes the saved boot location. Phase and measured verification progress
+stream to the management sheet, which stays open until the transaction ends.
+The original is retained as a recovery copy;
+unrecognized host files are never replaced. Lock files are recreated rather
+than opened for copying, because closing any descriptor for a locked inode
+would release the helper process's POSIX locks.
+
+Deletion runs a separate `--trash-vm` helper process. Confirmation captures the
+selected folder and disk identity. The helper validates the workspace, holds all
+launcher locks, rejects a changed disk or unsafe tree, and moves the complete
+folder to macOS Trash. Preferences and other VM copies are kept; failures never
+fall back to permanent removal.
 
 ## Build layout
 

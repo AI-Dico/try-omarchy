@@ -780,23 +780,52 @@ reinstall, or change to the factory image is needed.
 
 ### Choosing where the VM lives
 
-**Change…** on the start menu's **VM Location** row moves the VM to any folder
-you pick, including one on an external drive. Omarchy uses exactly the folder
-you choose — it never creates a folder inside it on your behalf.
+Open **Manage…** on the launcher's **Selected VM** row after shutting down
+Omarchy. The dialog shows the selected VM folder and explains what the next
+launch will do:
 
-- The folder must be **empty**, or one Omarchy has already used. A folder with
-  other files in it, or a drive's top level, is turned away with an
-  explanation instead of being restructured; create or pick an empty folder
-  (for example, one named "Try Omarchy") to use instead.
-- The drive must be **APFS**. The VM disk grows as you use it, which only APFS
-  supports here: on exFAT, FAT, or NTFS the same disk would claim its full size
-  the moment it was created. Network volumes are refused because the VM's disk
-  lock is unreliable on them. Anything else is turned away when you pick it, with
-  the actual format named.
-- You need roughly 7 GB free to create the VM, and up to 30 GB as it fills. The
-  disk is sparse, so it only ever occupies what the guest has actually written.
-- **Changing the location does not move your existing VM.** It stays where it
-  is, and switching back reaches it again.
+- **Switch to another VM → Choose Existing VM…** selects a saved VM in another
+  folder. Choose the complete folder containing `boot`, `disks`, and `locks`.
+  Files stay where they are; this changes which VM the app will launch.
+- **Move the selected VM → Choose Destination…** copies that VM into a completely
+  empty APFS folder, verifies every file, and selects the copy only after
+  success. The dialog shows copy and verification progress, then the new
+  selected folder and the original recovery-copy path. The original is kept.
+- **Create a separate VM → Choose Empty Folder…** selects an empty folder for a
+  fresh VM, created on the next launch. The previously selected VM is kept.
+- **Delete the selected VM → Delete VM…** shows the exact folder and asks you to
+  type `Try Omarchy` to confirm,
+  then moves the whole VM to macOS Trash. Other VM copies are kept. Recover
+  it from Trash before emptying Trash, or choose another VM or an empty folder
+  to continue. A running VM cannot be deleted.
+- **Use Default Folder** selects
+  `~/Library/Application Support/Try Omarchy/VM/v1` again. If that VM has been
+  deleted, the next launch creates a fresh VM there.
+
+Choices are saved immediately. **Done** returns to the launcher; press
+**Launch** there to start the selected VM. During copying, verification, or deletion,
+**Done** and the other choices are disabled. Errors stay in the dialog. Failed operations keep the selected VM intact.
+
+Moving always acts on the VM selected in the dialog. To move a different saved
+VM, switch to it first. Copies evolve independently after booting; switch
+between them with **Choose Existing VM…**.
+
+For example, create `~/Try Omarchy` in the folder picker to relocate the VM
+into your home directory. Omarchy uses exactly the selected folder. A drive's
+top level and unrelated populated folders are refused.
+
+Both locations must be on local **APFS** drives. Relocation holds the same
+POSIX locks as the launcher, refuses an open VM and unsafe links, and never
+replaces files at the destination. Same-volume copies use APFS clones;
+cross-volume copies preserve sparse capacity. Leave enough free space for the
+VM's allocated data plus 1 GiB of headroom. If copying or verification fails,
+the original and the selected boot location stay unchanged. Do not delete the
+original until you have booted and checked the relocated VM. Once you have
+checked your files and settings, you can delete that old workspace, or retain
+it as a recovery copy. For the default location, delete only `VM/v1`, keeping
+the surrounding `Try Omarchy` Application Support folder: it also stores the
+host Touch ID keys used by the relocated VM.
+
 - Do not disconnect the drive while Omarchy is running. macOS refuses a normal
   eject while the VM holds the disk, but pulling the cable can damage it. If the
   volume does disappear, Omarchy shuts the VM down instead of writing on.

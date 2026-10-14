@@ -698,6 +698,11 @@ def main() -> None:
 
     materialize = read(GUEST / "scripts/materialize-omarchy.sh")
     check(
+        'install_file 0644 "$source_dir/icon.txt" "$root/etc/skel/.config/omarchy/branding/about.txt"' in materialize
+        and 'install_file 0644 "$source_dir/logo.txt" "$root/etc/skel/.config/omarchy/branding/screensaver.txt"' in materialize,
+        "skel branding seeds the icon as About and the wordmark as the screensaver, as upstream does",
+    )
+    check(
         'mkdir -p "$root/etc/skel/.local/state/omarchy/toggles/hypr"' in materialize
         and 'copy_contents "$source_dir/default/hypr/toggles"' not in materialize
         and 'toggles/flags.lua' in materialize,

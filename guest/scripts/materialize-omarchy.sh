@@ -171,8 +171,8 @@ if [[ -f $source_dir/default/tensaku/state.toml ]]; then
   install_file 0644 "$source_dir/default/tensaku/state.toml" "$root/etc/skel/.local/state/tensaku/state.toml"
 fi
 mkdir -p "$root/etc/skel/.config/omarchy/branding"
-install_file 0644 "$source_dir/logo.txt" "$root/etc/skel/.config/omarchy/branding/about.txt"
-install_file 0644 "$source_dir/icon.txt" "$root/etc/skel/.config/omarchy/branding/screensaver.txt"
+install_file 0644 "$source_dir/icon.txt" "$root/etc/skel/.config/omarchy/branding/about.txt"
+install_file 0644 "$source_dir/logo.txt" "$root/etc/skel/.config/omarchy/branding/screensaver.txt"
 ln -sfn /usr/share/omarchy "$root/etc/skel/.local/share/omarchy"
 
 # Package-owned integration points needed by the real session.

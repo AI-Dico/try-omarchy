@@ -92,6 +92,32 @@ class JapaneseMigrationTests(unittest.TestCase):
             self.assertEqual(original, profile.read_bytes())
             self.assertEqual('current', self.run_user(payload, home, layout='jp')['japanese-input'])
 
+    def test_fcitx_commented_empty_layouts_are_stock_and_remain_idempotent(self):
+        for seed in ('profile-chewing.ini', 'profile-korean.ini', 'fcitx5-profile.ini'):
+            with self.subTest(seed=seed), tempfile.TemporaryDirectory() as directory:
+                payload, home = self.prepare(directory, seed)
+                profile = home / japanese.PROFILE
+                profile.write_text(profile.read_text().replace('DefaultIM=keyboard-us', 'DefaultIM=chewing')
+                                   .replace('\nLayout=\n', '\n# Layout=\n'))
+                self.assertEqual('applied', self.run_user(payload, home)['japanese-input'])
+                updated = japanese.parse(profile.read_bytes())
+                self.assertEqual('mozc', updated['Groups/0/Items/1']['Name'])
+                # A subsequent Fcitx save must not turn a migrated profile into
+                # another skipped update or cause unnecessary rewriting.
+                profile.write_text(profile.read_text().replace('\nLayout=\n', '\n# Layout=\n'))
+                saved = profile.read_bytes()
+                self.assertEqual('current', self.run_user(payload, home)['japanese-input'])
+                self.assertEqual(saved, profile.read_bytes())
+
+    def test_explicit_engine_layout_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            payload, home = self.prepare(directory, 'profile-chewing.ini')
+            profile = home / japanese.PROFILE
+            custom = profile.read_text().replace('\nLayout=\n', '\nLayout=jp\n', 1).encode()
+            profile.write_bytes(custom)
+            self.assertEqual('preserved', self.run_user(payload, home)['japanese-input'])
+            self.assertEqual(custom, profile.read_bytes())
+
     def test_japanese_layout_is_matched_so_mozc_uses_its_jis_kana_table(self):
         for seed in ('profile-chewing.ini', 'profile-korean.ini'):
             with self.subTest(seed=seed), tempfile.TemporaryDirectory() as directory:

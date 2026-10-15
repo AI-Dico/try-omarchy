@@ -3,6 +3,7 @@ import base64
 import configparser
 import io
 import os
+import re
 
 INPUT = '.config/hypr/input.lua'  # Revision 1 journals can still contain this path.
 PROFILE = '.config/fcitx5/profile'
@@ -34,6 +35,12 @@ def keyboard_layout(vconsole):
 def profile_update(data, payload, japanese, layout='us'):
     """Recognize historical seeds and their Fcitx-saved forms, not arbitrary INI."""
     existing = parse(data)
+    # Fcitx comments out empty per-engine layouts when saving a stock profile.
+    # An omitted Layout has the same meaning as Layout=; retain every explicit
+    # value and every other field so personal profiles still fail recognition.
+    for section, values in existing.items():
+        if re.fullmatch(r'Groups/\d+/Items/\d+', section):
+            values.setdefault('Layout', '')
     # Current factories seed the owner's layout with Mozc first before first login.
     initialized = parse((payload / 'fcitx5-profile.ini').read_bytes())
     initialized['Groups/0'].update({'Default Layout': layout, 'DefaultIM': 'mozc'})

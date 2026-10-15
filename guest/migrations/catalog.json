@@ -13,7 +13,7 @@
   "migrations": [
     {
       "id": "japanese-input",
-      "revision": 3,
+      "revision": 4,
       "title": "Japanese input",
       "icon": "keyboard",
       "note": "Installs missing Japanese input packages without upgrading other packages. Downloads need internet; installed packages are kept if another fix fails."

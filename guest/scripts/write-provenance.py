@@ -111,6 +111,8 @@ def main() -> None:
         "backportedRuntimeTrees": backported_trees,
         "backports": backports,
         "sha256Trees": trees,
+        "migrationRevisions": {entry["id"]: entry["revision"] for entry in
+                               json.loads((args.spec.parent / "migrations/catalog.json").read_text())["migrations"]},
     }
     source_digest = args.root / "usr/share/try-omarchy/upstream-tree.json"
     if source_digest.exists():

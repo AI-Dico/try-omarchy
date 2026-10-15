@@ -78,6 +78,17 @@ review. Run `make guest` and `make test`. The upstream source can report a devel
 version even for an official tag, so never hand-edit the `version` or `release`
 fields to make them agree; they record different upstream identities.
 
+## Updating existing-VM migrations
+
+`guest/migrations/catalog.json` gives every migration a stable ID and revision.
+Increment the affected migration's revision whenever its repair behavior or
+managed payload changes. Keep the ID when revising an existing migration; use a
+new ID only for a new handler. The launcher compares these revisions against
+per-VM receipts, so changing only the complete bundle hash does not make an
+unchanged revision appear again. Review shared helper changes against every
+migration they affect. Tests should cover the revision delta and preserved,
+failed, and interrupted outcomes.
+
 ## Tests
 
 `make test` runs the complete suite with up to four independent suites at once.

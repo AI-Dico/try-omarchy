@@ -19,6 +19,14 @@ private func effectiveArguments() -> [String] {
 
 let arguments = effectiveArguments()
 do {
+    if arguments.first == "--seed-migration-baseline" {
+        guard arguments.count == 4, let catalog = GuestBootFixCatalog.bundled,
+              let identity = GuestBootFixCache.bundledIdentity else { usage() }
+        try GuestBootFixCache.seedFactory(storageRoot: URL(fileURLWithPath: arguments[1]),
+            diskURL: URL(fileURLWithPath: arguments[2]), provenanceURL: URL(fileURLWithPath: arguments[3]),
+            catalog: catalog, identity: identity)
+        exit(0)
+    }
     if arguments.first == "--host-timezone" {
         guard arguments.count == 1 else { usage() }
         let zone = HostTimeZone.current()

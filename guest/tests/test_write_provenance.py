@@ -45,6 +45,8 @@ class WriteProvenanceTests(unittest.TestCase):
                 }
             ],
         }
+        (base / "migrations").mkdir()
+        (base / "migrations/catalog.json").write_text(json.dumps({"migrations": [{"id": "example", "revision": 2}]}))
         spec = base / "spec.json"
         spec.write_text(
             json.dumps(
@@ -143,6 +145,7 @@ class WriteProvenanceTests(unittest.TestCase):
             result = self.run_writer(root, spec, output)
             self.assertEqual(result.returncode, 0, result.stderr)
             provenance = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(provenance["migrationRevisions"], {"example": 2})
             self.assertEqual(provenance["verbatimRuntimeTrees"], ["bin"])
             self.assertEqual(provenance["backportedRuntimeTrees"], ["shell"])
             self.assertEqual(provenance["backports"][0]["id"], "fixture")

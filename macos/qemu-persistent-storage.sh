@@ -22,6 +22,7 @@ QEMU_PERSISTENT_STORAGE_MISSING_STATUS=79
 QEMU_PERSISTENT_STORAGE_HEADROOM_BYTES=1073741824
 
 QEMU_SELECTED_DISK=''
+QEMU_SELECTED_DISK_CREATED=0
 QEMU_SELECTED_STORAGE_MODE=''
 QEMU_PERSISTENT_STORAGE_DIRECTORY=''
 QEMU_PERSISTENT_STORAGE_IDENTITY=''
@@ -1327,6 +1328,7 @@ _qps_initialize_persistent_disk() {
     _qps_fail 'cannot flush persistent-disk parent directory'
     return 1
   }
+  QEMU_SELECTED_DISK_CREATED=1
   _qps_error "initialized persistent workspace ${qps_identity:0:12}"
 }
 
@@ -1741,6 +1743,7 @@ qemu_persistent_storage_reset() {
   if _qps_clear_workspace_locked "$qps_identity" "$qps_storage_key"; then
     _qps_reset_progress finishing
     QEMU_SELECTED_DISK=''
+  QEMU_SELECTED_DISK_CREATED=0
     QEMU_SELECTED_STORAGE_MODE=''
     QEMU_PERSISTENT_STORAGE_WORKING_BYTES=''
     QEMU_PERSISTENT_STORAGE_NEEDS_BOOT_RECOVERY=0
@@ -1898,6 +1901,7 @@ qemu_persistent_storage_select_existing() {
   local qps_status=0
 
   QEMU_SELECTED_DISK=''
+  QEMU_SELECTED_DISK_CREATED=0
   QEMU_SELECTED_STORAGE_MODE=''
   QEMU_PERSISTENT_STORAGE_DIRECTORY=''
   QEMU_PERSISTENT_STORAGE_IDENTITY=''
@@ -1994,6 +1998,7 @@ qemu_persistent_storage_select() {
   local qps_zstd=${11:-}
 
   QEMU_SELECTED_DISK=''
+  QEMU_SELECTED_DISK_CREATED=0
   QEMU_SELECTED_STORAGE_MODE=''
   QEMU_PERSISTENT_STORAGE_DIRECTORY=''
   QEMU_PERSISTENT_STORAGE_IDENTITY=''

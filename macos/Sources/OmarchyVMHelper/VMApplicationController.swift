@@ -396,7 +396,7 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
         return GuestBootFixCache.url(storageRoot: root, diskURL: disk)
     }
 
-    private func startVirtualMachine(allowBootRecovery: Bool = false, reviewBootFixes: Bool = false) {
+    private func startVirtualMachine(allowBootRecovery: Bool = false, reviewBootFixes: Bool = false, skipMigrationCheck: Bool = false) {
         cancelHostWakeRetry()
         virtualMachineReachedStart = false
         pendingHostSleepControlFailure = nil
@@ -424,21 +424,6 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
                 startMenuWindow?.launchDidAbort()
                 return
             }
-            let fixesURL = bootFixCacheURL()
-            var fixesConsent: String?
-            if GuestBootFixCache.needsReview(cacheURL: fixesURL, expectedIdentity: GuestBootFixCache.bundledIdentity,
-                                             manuallyRequested: reviewBootFixes) {
-                do { try GuestBootFixCache.recordReview(cacheURL: fixesURL, identity: GuestBootFixCache.bundledIdentity) }
-                catch { fputs("[boot-fixes] Could not retain review: \(error.localizedDescription)\n", stderr) }
-                switch startMenuWindow?.confirmBootFixes() ?? .cancel {
-                case .cancel:
-                    startMenuWindow?.launchDidAbort()
-                    return
-                case .skip: break
-                case .update:
-                    fixesConsent = GuestBootFixCache.consent(cacheURL: fixesURL, identity: GuestBootFixCache.bundledIdentity)
-                }
-            }
             var approvedBootRecovery = allowBootRecovery
             if !approvedBootRecovery {
                 let preflight: BootRecoveryLaunchPreflight
@@ -464,6 +449,26 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
                     approvedBootRecovery = allowBootRecovery
                 }
             }
+            let fixesURL = bootFixCacheURL()
+            if !skipMigrationCheck, let fixesURL, GuestBootFixCache.read(fixesURL)?.revisions == nil {
+                try inspectMigrations(cacheURL: fixesURL, allowBootRecovery: approvedBootRecovery,
+                                      reviewBootFixes: reviewBootFixes)
+                return
+            }
+            var fixesConsent: String?
+            if !skipMigrationCheck, GuestBootFixCache.needsReview(cacheURL: fixesURL, expectedIdentity: GuestBootFixCache.bundledIdentity,
+                                             manuallyRequested: reviewBootFixes) {
+                do { try GuestBootFixCache.recordReview(cacheURL: fixesURL, identity: GuestBootFixCache.bundledIdentity) }
+                catch { fputs("[boot-fixes] Could not retain review: \(error.localizedDescription)\n", stderr) }
+                switch startMenuWindow?.confirmBootFixes() ?? .cancel {
+                case .cancel:
+                    startMenuWindow?.launchDidAbort()
+                    return
+                case .skip: break
+                case .update:
+                    fixesConsent = GuestBootFixCache.consent(cacheURL: fixesURL, identity: GuestBootFixCache.bundledIdentity)
+                }
+            }
             let cameraDecision = CameraPreflight.decision()
             if let warning = cameraDecision.warning {
                 fputs("[camera] \(warning)\n", stderr)
@@ -478,6 +483,65 @@ final class VMApplicationController: NSObject, NSApplicationDelegate {
             )
         } catch {
             failLaunch(error)
+        }
+    }
+
+    private func inspectMigrations(cacheURL: URL, allowBootRecovery: Bool, reviewBootFixes: Bool) throws {
+        guard let catalog = GuestBootFixCatalog.bundled, let identity = GuestBootFixCache.bundledIdentity else {
+            throw HelperError.io("The VM update catalog is unavailable. Reinstall Try Omarchy before checking this VM.")
+        }
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("try-omarchy-migrations-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false,
+                                               attributes: [.posixPermissions: 0o700])
+        let context = childLaunchContext()
+        activeStateRoot = context.stateRoot
+        var environment = context.environment
+        if allowBootRecovery { environment = QEMUGPURuntimeEnvironment.withBootRecoveryConsent(environment) }
+        environment.removeValue(forKey: QEMUGPURuntimeEnvironment.guestFixesConsentKey)
+        let originalCacheURL = cacheURL
+        startMenuWindow?.show()
+        startMenuWindow?.launchDidProgress(to: .inspecting)
+        do {
+            try supervisor.start(executableURL: launcherURL,
+                arguments: ["--check-migrations", output.path] + launchArguments(), environment: environment
+            ) { [weak self] status in
+                defer { try? FileManager.default.removeItem(at: output) }
+                guard let self else { return }
+                self.childRunning = false
+                if self.applicationTerminationPending {
+                    NSApp.reply(toApplicationShouldTerminate: true)
+                    return
+                }
+                if self.lifecycle.isTerminating { self.finish(status: status); return }
+                do {
+                    guard status == 0 else {
+                        throw HelperError.io("The VM migration check did not finish. Your disk was left unchanged. Try launching again.\n\n" + self.supervisor.recentStandardError)
+                    }
+                    // Recheck selection after the process releases the workspace lock.
+                    guard self.bootFixCacheURL() == originalCacheURL else {
+                        throw HelperError.io("The selected VM changed during its migration check. Try launching again.")
+                    }
+                    let report = try GuestMigrationInspection.read(output: output, identity: identity, catalog: catalog)
+                    try GuestBootFixCache.retain(report, cacheURL: originalCacheURL, catalog: catalog)
+                    self.startVirtualMachine(allowBootRecovery: allowBootRecovery, reviewBootFixes: reviewBootFixes)
+                } catch {
+                    self.startMenuWindow?.show()
+                    let alert = NSAlert()
+                    alert.messageText = "VM updates couldn’t be checked"
+                    alert.informativeText = "Your VM was left unchanged. You can launch without updating and try the check again on a later launch.\n\n" + error.localizedDescription
+                    alert.addButton(withTitle: "Cancel")
+                    alert.addButton(withTitle: "Launch Without Updating")
+                    if alert.runModal() == .alertSecondButtonReturn {
+                        self.startVirtualMachine(allowBootRecovery: allowBootRecovery, skipMigrationCheck: true)
+                    } else {
+                        self.startMenuWindow?.launchDidAbort()
+                    }
+                }
+            }
+            childRunning = true
+        } catch {
+            try? FileManager.default.removeItem(at: output)
+            throw error
         }
     }
 

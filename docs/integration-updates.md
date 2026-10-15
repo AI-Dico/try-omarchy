@@ -15,13 +15,19 @@ requiring installation of integration support.
 ## Updates at launch
 
 Compatible repairs have an **Update and Launch** action at the bottom of the
-Mac launcher on the first app open with an existing disk that has no check for
-the current fix bundle, or when a matching check found unfinished work.
-No preliminary VM boot is needed. Automatic startup (Skip Launcher) shows the
+Mac launcher when the selected disk has new or revised migrations or unfinished work.
+For an existing VM without revision history, the first launch runs one headless
+inspection using its saved kernel and initramfs. QEMU keeps all guest writes in a
+disposable overlay; the selected disk is unchanged. No network or host integration
+bridges are connected. The launcher shows **Checking migrations…**, then opens the
+review only when the check finds applicable work. A failed or incomplete check
+never establishes history and offers **Launch Without Updating** as a fallback.
+
+Automatic startup (Skip Launcher) shows the
 launcher when that bundle needs its first review, then resumes normally on
 later opens. A missing disk or a VM with a current result keeps **Launch Omarchy**.
 
-**Update and Launch** opens a review of the supported existing-VM repairs listed below. Choose
+**Update and Launch** opens a review of new, revised, or unfinished repairs. Choose
 **Update and Launch**, **Skip**, or **Cancel**. Skip requires a second
 **Skip and Launch** confirmation and leaves the fixes available for manual retry.
 The review appears automatically only once per disk and fix bundle, including
@@ -33,10 +39,20 @@ unconfirmed attempts also stay manual. The existing settings, timezone integrati
 payload still run; Skip applies only to the reviewed repairs.
 
 The review list comes from the shared [migration catalog](../guest/migrations/catalog.json).
-It lists the full set of supported repairs, rather than a pre-boot inspection of
-the selected disk. The guest determines which files are current, need updating,
-or must be preserved when it boots. Catalog revisions describe components;
-approval and review reminders remain tied to the complete bundle's content hash.
+Each migration has an ID and revision. The host retains a per-disk baseline and
+shows only added IDs, higher revisions, and unfinished migrations. Rows, groups,
+and notes are all filtered to that selection. A successful check or update records
+steps that are current, applied, or explicitly preserved/unavailable; failed and
+pending steps remain available. Later app upgrades compare these revisions without
+another inspection boot. The guest still checks compatibility before applying changes.
+
+Factory provenance records the revisions included in the image. A newly created
+or reset VM starts from that factory baseline, rather than inheriting the old
+VM's history or assuming every migration in a newer app was in an older image.
+History is bound to the disk's inode and creation time, so reset cannot reuse old
+receipts even when an inode is recycled. A copied disk without matching host history
+receives its own one-time check. Approval and review reminders remain tied to the
+complete bundle's content hash; revision receipts never authorize installation.
 
 Approval is limited to the reviewed bundle and selected disk's file identity,
 rechecked under the workspace lock. The existing temporary boot service runs
@@ -66,8 +82,8 @@ After an approved update, the Mac app shows one brief result message: the update
 finished, or it could not be completed or confirmed. Results do not add a
 persistent report or notice to the launcher. No report or no response establishes
 success.
-Results are scoped to that VM disk and fix bundle; another disk or reset does
-not inherit completion. A missing result offers review before boot;
+Results are scoped to that VM disk; another disk or reset does
+not inherit completion. A missing revision baseline triggers the one-time check before review;
 an unconfirmed approved update leaves a manual retry available through **Update and Launch**.
 
 <a id="manual-upgrade-commands-covered-by-update"></a>

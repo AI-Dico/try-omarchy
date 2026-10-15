@@ -17,6 +17,7 @@ FORCE ?= 0
 TEST_JOBS ?= 4
 
 SHELL_TESTS := network-helper qemu-networking qemu-port-forwarding \
+  migration-inspection \
   run-qemu-ssh-contract qemu-memory-contract qemu-power-actions \
   qemu-usb-passthrough qemu-monitor-ready qemu-persistent-storage
 SHELL_TEST_TARGETS := $(addprefix test-shell-,$(SHELL_TESTS))

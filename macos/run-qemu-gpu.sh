@@ -14,6 +14,7 @@ fail() {
 
 storage_mode=persistent
 reset_only=0
+migration_check_output=""
 boot_recovery_consent_required_status=80
 boot_recovery_failed_status=81
 # QEMU 11's HVF backend requires Apple's in-hypervisor GICv3. Keep recovery
@@ -26,6 +27,11 @@ boot_recovery_fail() {
 }
 
 case ${1:-} in
+  --check-migrations)
+    migration_check_output=${2:-}
+    [[ $migration_check_output == /* && -d $migration_check_output && ! -L $migration_check_output ]] || fail 'migration check requires a private output directory'
+    shift 2
+    ;;
   --ephemeral)
     storage_mode=ephemeral
     shift
@@ -1548,6 +1554,9 @@ if [[ $storage_mode == persistent ]]; then
   fi
 fi
 
+if [[ -n $migration_check_output && $selected_existing == 0 ]]; then
+  fail 'the VM selected for inspection no longer exists'
+fi
 if (( selected_existing == 0 )); then
   if [[ -n $disk_capacity_bytes ]]; then
     (( disk_capacity_bytes >= expanded_disk_bytes )) || fail 'maximum disk size is below the factory capacity'
@@ -1581,6 +1590,9 @@ if (( selected_existing == 0 )); then
   fi
 fi
 working_disk=$QEMU_SELECTED_DISK
+if (( ${QEMU_SELECTED_DISK_CREATED:-0} )) && [[ $QEMU_SELECTED_STORAGE_MODE == persistent ]]; then
+  "$native_bridge" --seed-migration-baseline "$QEMU_PERSISTENT_STORAGE_ROOT" "$working_disk" "$guest_dir/provenance.json" || fail 'could not record the factory migration baseline'
+fi
 
 case ${OMARCHY_QEMU_GPU_DRY_RUN:-0} in
   0|1) ;;
@@ -1603,13 +1615,22 @@ launch_kernel_command_line=$QEMU_SELECTED_KERNEL_COMMAND_LINE
 [[ -n $launch_kernel && -n $launch_initramfs && -n $launch_kernel_command_line ]] || {
   fail 'the selected VM has no complete boot kit'
 }
+if [[ -n $migration_check_output ]]; then
+  "$script_dir/check-migrations.sh" "$qemu_bin" "$launch_kernel" "$launch_initramfs" \
+    "$launch_kernel_command_line" "$working_disk" "$resources_dir/guest-settings" "$migration_check_output" "$QEMU_PERSISTENT_STORAGE_QEMU_ADD_FD" &
+  qemu_pid=$!
+  wait "$qemu_pid"
+  qemu_pid=''
+  exit 0
+fi
+
 case " $launch_kernel_command_line " in
   *' omarchy.virgl_dual_source='*)
     fail "selected kernel command line contains a launcher-owned VirGL capability argument"
     ;;
 esac
 
-if [[ -n $disk_capacity_bytes && $storage_mode == persistent && ${OMARCHY_QEMU_GPU_DRY_RUN:-0} == 0 ]]; then
+if [[ -z $migration_check_output && -n $disk_capacity_bytes && $storage_mode == persistent && ${OMARCHY_QEMU_GPU_DRY_RUN:-0} == 0 ]]; then
   qemu_persistent_storage_grow_selected "$disk_capacity_bytes" "$native_bridge" || \
     fail 'could not apply maximum disk size'
 fi

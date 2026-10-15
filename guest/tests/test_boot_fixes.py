@@ -17,6 +17,20 @@ class BootFixTests(unittest.TestCase):
         helper.seed_legacy_native_files(root)
         return payload, root
 
+    def test_inspection_never_accepts_boot_consent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            payload, root = self.prepare(directory)
+            identity = fixes.bundle_manifest(payload)['identity']
+            real_read_text = Path.read_text
+            def read_text(path, *args, **kwargs):
+                if path == Path('/proc/cmdline'):
+                    return f'tryomarchy.fixes={identity}'
+                return real_read_text(path, *args, **kwargs)
+            with patch.object(Path, 'read_text', read_text), patch.object(fixes, 'migrate') as migrate:
+                fixes.boot(payload, inspect=True)
+            self.assertFalse(migrate.call_args.args[2])
+            self.assertTrue(migrate.call_args.kwargs['users'])
+
     def test_skip_changes_no_managed_files_and_reports_pending(self):
         with tempfile.TemporaryDirectory() as directory:
             payload, root = self.prepare(directory)

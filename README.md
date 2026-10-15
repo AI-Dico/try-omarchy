@@ -559,16 +559,16 @@ accept values between menu steps, down to the guest's 2048 MiB minimum. The
 ## Language
 
 New VMs inherit the Mac's primary language on first boot: English, Traditional
-Chinese (`zh_TW.UTF-8`), Simplified Chinese (`zh_CN.UTF-8`), or Korean
-(`ko_KR.UTF-8`). Other Mac languages currently fall back to English. There is no
-launcher language setting; change the locale inside Omarchy afterward. Later
+Chinese (`zh_TW.UTF-8`), Simplified Chinese (`zh_CN.UTF-8`), Korean
+(`ko_KR.UTF-8`), or Japanese (`ja_JP.UTF-8`). Other Mac languages currently fall
+back to English. There is no launcher language setting; change the locale inside Omarchy afterward. Later
 boots and Mac language changes do not overwrite that guest choice. Existing VMs
 keep their saved language.
 
 Applications use translations where available. Omarchy's own setup wizard and
 menus stay in English: upstream has no translation mechanism for those shell
-scripts. The US keyboard layout remains the default input method; fcitx5 also
-includes Chewing (Bopomofo), reachable with `Ctrl + Space` in the Default group.
+scripts. Fcitx5 includes Chewing (Bopomofo) and Mozc (Japanese) in the Default
+group; `Ctrl + Space` toggles the selected input method.
 A Korean Mac automatically selects the Korean group for the first owner account,
 so `Ctrl + Space` toggles US and Hangul. Other languages keep the Default group.
 Noto CJK KR glyph variants are preferred for Korean text; the Traditional Chinese
@@ -577,6 +577,27 @@ font preference remains unchanged.
 These defaults apply to new or reset guests; an existing VM keeps its packages
 and profile. To switch groups manually, run `fcitx5-remote -g Korean` or
 `fcitx5-remote -g Default` in a guest terminal; the choice persists.
+
+### Japanese input
+
+Follow the [native Omarchy workflow](https://omarchy.org/manual/keyboard-mouse-trackpad/#typing-in-chinese-japanese-and-other-languages)
+**inside the VM**. New VMs include the required packages; on older VMs, install
+them if missing:
+
+```sh
+omarchy pkg add fcitx5-mozc fcitx5-configtool
+```
+
+Open **Fcitx 5 Configuration** from the application launcher, or run
+`fcitx5-configtool`. Add **Mozc** if absent and place it after your keyboard,
+before other input engines. Keep the keyboard layout matching your physical
+keyboard. In **Global Options**, choose a switching shortcut such as
+**Ctrl + Space**.
+
+In a text editor, activate Mozc, type `nihongo`, press **Space** to convert to
+日本語, then **Enter** to commit. macOS and Omarchy select their input methods
+independently. See [Japanese input](docs/japanese-input.md) for JIS keys and
+troubleshooting.
 
 ## Requirements
 

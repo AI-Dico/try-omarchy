@@ -16,7 +16,7 @@ struct GuestBootFixReport: Codable, Equatable {
     var needsUpdate: Bool {
         switch state {
         case "complete": return false
-        case "skipped": return components.values.contains("pending")
+        case "skipped": return components.values.contains { ["pending", "update-required"].contains($0) }
         default: return true
         }
     }
@@ -44,8 +44,8 @@ struct GuestBootFixReport: Codable, Equatable {
               value.identity.allSatisfy({ "0123456789abcdef".contains($0) }),
               ["checking", "running", "complete", "skipped", "failed", "recovery-required", "unconfirmed"].contains(value.state),
               knownSets.contains(Set(value.components.keys)) || validHistoricalIDs,
-              value.components.values.allSatisfy({ ["current", "applied", "preserved", "unavailable", "pending", "failed"].contains($0) }),
-              value.state != "complete" || !value.components.values.contains(where: { ["pending", "failed"].contains($0) })
+              value.components.values.allSatisfy({ ["current", "applied", "preserved", "unavailable", "pending", "update-required", "failed"].contains($0) }),
+              value.state != "complete" || !value.components.values.contains(where: { ["pending", "update-required", "failed"].contains($0) })
         else { throw HelperError.io("invalid boot fixes report") }
         return value
     }
@@ -77,6 +77,7 @@ struct GuestBootFixReport: Codable, Equatable {
         let labels = ["current": "already current or not needed", "applied": "applied and verified",
                       "preserved": "customized or unsupported files preserved",
                       "unavailable": "skipped · required tools or runtime unavailable", "pending": "pending",
+                      "update-required": "pending · run omarchy update inside the VM first",
                       "failed": "failed · previous installation kept"]
         return components.keys.sorted().map {
             "\(names[$0] ?? $0): \(labels[components[$0] ?? "pending"]!)"
@@ -98,13 +99,17 @@ struct GuestBootFixResult {
     init?(report: GuestBootFixReport, catalog: GuestBootFixCatalog? = .bundled) {
         let names = Dictionary(uniqueKeysWithValues: (catalog?.migrations ?? []).map { ($0.id, $0.title) })
         let skipped = report.components.keys.sorted().filter {
-            ["preserved", "unavailable", "pending", "failed"].contains(report.components[$0] ?? "")
+            ["preserved", "unavailable", "pending", "update-required", "failed"].contains(report.components[$0] ?? "")
         }.map { names[$0] ?? $0 }.joined(separator: ", ")
 
         switch report.state {
         case "checking", "running": return nil
         case "complete", "skipped":
-            if skipped.isEmpty {
+            if report.components.values.contains("update-required") {
+                title = "Update Omarchy to finish VM setup"
+                message = "Pending or skipped: \(skipped).\n\nInside Omarchy, run omarchy update and let it finish successfully. Then shut down Omarchy, reopen Try Omarchy, and choose Update and Launch. Hold Option while opening the app if you skip the launcher."
+                isWarning = true
+            } else if skipped.isEmpty {
                 title = "VM update complete"
                 message = "Your VM is ready to use."
                 isWarning = false

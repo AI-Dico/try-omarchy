@@ -709,6 +709,11 @@ after shutting down the VM. They do not interrupt subsequent automatic launches.
 No terminal commands, SSH, or personal folder sharing are
 needed for normal migration.
 
+If Japanese input setup asks for a system update, run `omarchy update` inside
+Omarchy and let it finish successfully. Shut down Omarchy, reopen Try Omarchy
+(hold **Option** if you skip the launcher), and choose **Update and Launch**
+to retry the pending setup. No separate guest reboot is needed first.
+
 This covers the supported clipboard/screensaver fixes, Alacritty cleanup,
 power/menu plugins, clock recovery, compatibility holds, missing lock-screen
 password policy, pinch input, integration setup, and eligible Mac battery

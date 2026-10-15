@@ -321,6 +321,50 @@ class JapaneseMigrationTests(unittest.TestCase):
                 self.assertEqual('current', current['components']['japanese-input'])
                 installer.assert_called_once()
 
+    def test_system_update_deferral_stays_pending_until_an_approved_retry(self):
+        import pwd
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            payload, home = self.prepare(directory)
+            root = Path(directory) / 'root'
+            pacman = root / 'usr/bin/pacman'
+            pacman.parent.mkdir(parents=True)
+            pacman.touch()
+            module = support.fixes.components(payload)
+            account = SimpleNamespace(pw_uid=1000, pw_name='owner', pw_dir=str(home))
+            original = (home / japanese.PROFILE).read_bytes()
+            calls = []
+            def run(args, **kwargs):
+                calls.append(args)
+                result = users.migrate(payload, home, '--apply' in args,
+                                       japanese='--japanese' in args, language='ja_JP.UTF-8', layout='jp')
+                return SimpleNamespace(stdout=json.dumps(result))
+            def install(root):
+                register(root, *extras.JAPANESE_PACKAGES)
+                return 'applied'
+            with patch.object(support.fixes, 'components', return_value=module), \
+                    patch.object(pwd, 'getpwall', return_value=[account]), \
+                    patch.object(support.fixes.subprocess, 'run', side_effect=run), \
+                    patch.object(module, 'install_japanese', return_value='update-required') as installer:
+                for _ in range(2):
+                    deferred = support.fixes.migrate(payload, root, True, '', users=True)
+                    self.assertEqual('skipped', deferred['state'])
+                    self.assertEqual('update-required', deferred['components']['japanese-input'])
+                    self.assertEqual(original, (home / japanese.PROFILE).read_bytes())
+                self.assertTrue(all('--japanese' not in args for args in calls))
+                installer.reset_mock()
+                checked = support.fixes.migrate(payload, root, False, '', users=True)
+                self.assertEqual('pending', checked['components']['japanese-input'])
+                installer.assert_not_called()
+                installer.side_effect = install
+                retried = support.fixes.migrate(payload, root, True, '', users=True)
+                self.assertEqual('complete', retried['state'])
+                self.assertEqual('applied', retried['components']['japanese-input'])
+                self.assertEqual('mozc', japanese.parse((home / japanese.PROFILE).read_bytes())['Groups/0']['DefaultIM'])
+                current = support.fixes.migrate(payload, root, True, '', users=True)
+                self.assertEqual('current', current['components']['japanese-input'])
+                installer.assert_called_once_with(root)
+
     def test_package_failure_is_reported_and_does_not_apply_input_configuration(self):
         with tempfile.TemporaryDirectory() as directory:
             payload, home = self.prepare(directory)
@@ -410,7 +454,7 @@ class JapaneseMigrationTests(unittest.TestCase):
                 patch.object(Path, 'is_file', return_value=True), \
                 patch.object(Path, 'exists', return_value=False), \
                 patch.object(extras, 'run', return_value=subprocess.CompletedProcess([], 0, 'qt6-base\n', '')) as run:
-            self.assertEqual('unavailable', extras.install_japanese(Path('/')))
+            self.assertEqual('update-required', extras.install_japanese(Path('/')))
             run.assert_called_once_with(['pacman', '-Quq'], check=False)
 
     def test_project_holds_do_not_require_upgrading_the_pinned_stack(self):

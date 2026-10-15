@@ -61,7 +61,12 @@ choice. When any of the factory's Japanese input packages are missing
 `pacman -S --needed --noconfirm`, using the guest's existing repository databases
 and signature policy. It does not refresh those databases or run a system
 upgrade. If the databases show ordinary installed packages awaiting an update,
-installation is skipped; run `omarchy update` inside the VM first. Project-held
+installation stays pending. The result dialog tells you to run `omarchy update`
+inside the VM and let it finish successfully, then shut down Omarchy, reopen
+Try Omarchy, and choose **Update and Launch**. Hold **Option** while opening the
+app if **Skip launcher** is enabled. No separate guest reboot is needed first;
+the next **Update and Launch** retries the missing package
+installation and recognized stock-profile setup. Project-held
 packages are excluded from this check. If a mirror no longer has the recorded
 package versions, installation fails without refreshing and retrying.
 The command holds the project's kernel, headers, runtime, and validated Hyprland

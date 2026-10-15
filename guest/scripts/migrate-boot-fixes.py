@@ -348,6 +348,10 @@ def migrate(payload, root, approved, cmdline, emit=lambda _: None, uid=None, use
                     outcomes['desktop'] = 'pending'
                     if outcomes.get('japanese-input') in ('current', 'applied', 'pending'):
                         outcomes['japanese-input'] = 'pending'
+        # A deferred package install must remain retryable, even when the other
+        # system and user repairs completed successfully.
+        if state == 'complete' and 'update-required' in outcomes.values():
+            state = 'skipped'
         value = {"schema": 1, "type": "boot-fixes", "identity": identity,
                  "state": state, "components": {name: outcomes[name] for name in component_ids}}
         emit(value)

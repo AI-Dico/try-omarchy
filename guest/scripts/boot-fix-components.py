@@ -317,7 +317,7 @@ def install_japanese(root):
     if set(upgrades.stdout.split()) - set(protected):
         print('Japanese input setup needs a system update. Run omarchy update inside the VM first.',
               file=sys.stderr, flush=True)
-        return 'unavailable'
+        return 'update-required'
     # Networking normally starts alongside the boot payload. Ensure the vendor
     # service has started before attempting the bounded download.
     run(['systemctl', 'start', 'NetworkManager.service'], timeout=15)

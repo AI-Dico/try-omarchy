@@ -42,8 +42,8 @@ The review list comes from the shared [migration catalog](../guest/migrations/ca
 Each migration has an ID and revision. The host retains a per-disk baseline and
 shows only added IDs, higher revisions, and unfinished migrations. Rows, groups,
 and notes are all filtered to that selection. A successful check or update records
-steps that are current, applied, or explicitly preserved/unavailable; failed and
-pending steps remain available. Later app upgrades compare these revisions without
+steps that are current, applied, or explicitly preserved/unavailable; failed,
+pending, and system-update-required steps remain available. Later app upgrades compare these revisions without
 another inspection boot. The guest still checks compatibility before applying changes.
 
 Factory provenance records the revisions included in the image. A newly created
@@ -118,8 +118,14 @@ The Japanese-input migration installs only missing Japanese input packages
 (Mozc, Fcitx5 and its GTK/Qt modules, its configuration tool, and CJK fonts) and
 their required dependencies from the guest's configured package repositories.
 Repository databases are not refreshed. If they show pending updates to ordinary
-installed packages, installation is skipped until the user completes
-`omarchy update` inside the VM. Missing mirror files fail without a refresh/retry.
+installed packages, installation remains pending. The result dialog instructs
+the user to finish `omarchy update` inside the VM, shut down Omarchy, reopen
+Try Omarchy, and choose **Update and Launch**. Hold **Option** when opening the
+app to return to the launcher if needed. No separate guest reboot is needed
+first. Approval stays in the running VM's kernel command line, so an in-guest
+reboot can also retry within a session started with **Update and Launch**;
+a session started without approval only checks the fixes.
+Missing mirror files fail without a refresh/retry.
 This avoids selectively installing newer dependencies into an older system. Kernel,
 headers, runtime, and the validated Hyprland stack are explicitly held. Guests
 that already have every package make no package changes.

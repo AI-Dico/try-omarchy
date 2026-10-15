@@ -59,6 +59,42 @@ struct GuestMigrationHistoryTests {
         #expect(GuestBootFixCache.pendingIDs(cacheURL: url, catalog: catalog) == [])
     }
 
+    @Test("A required system update gives instructions and keeps only unfinished migrations available")
+    func systemUpdateRetry() throws {
+        let catalog = try migrationCatalogFixture()
+        let directory = try directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.json")
+        var outcomes = Dictionary(uniqueKeysWithValues: catalog.componentIDs.map { ($0, "applied") })
+        outcomes["japanese-input"] = "update-required"
+        let report = GuestBootFixReport(schema: 1, type: "boot-fixes", identity: identity,
+            state: "skipped", components: outcomes)
+        let decoded = try GuestBootFixReport.decode(JSONEncoder().encode(report), catalog: catalog)
+        #expect(decoded.needsUpdate)
+        let result = try #require(GuestBootFixResult(report: decoded, catalog: catalog))
+        #expect(result.isWarning)
+        #expect(result.message.contains("Japanese input"))
+        #expect(result.message.contains("omarchy update"))
+        #expect(result.message.contains("shut down Omarchy"))
+        #expect(result.message.contains("Update and Launch"))
+        #expect(decoded.detail(catalog: catalog).contains("run omarchy update"))
+        try GuestBootFixCache.recordReview(cacheURL: url, identity: identity)
+        for _ in 0..<2 {
+            try GuestBootFixCache.retain(decoded, cacheURL: url, catalog: catalog)
+            #expect(GuestBootFixCache.pendingIDs(cacheURL: url, catalog: catalog) == ["japanese-input"])
+            #expect(GuestBootFixCache.read(url)?.report.needsUpdate == true)
+        }
+        let invalid = GuestBootFixReport(schema: 1, type: "boot-fixes", identity: identity,
+            state: "complete", components: outcomes)
+        #expect(throws: (any Error).self) {
+            try GuestBootFixReport.decode(JSONEncoder().encode(invalid), catalog: catalog)
+        }
+        outcomes["japanese-input"] = "applied"
+        try GuestBootFixCache.retain(.init(schema: 1, type: "boot-fixes", identity: identity,
+            state: "complete", components: outcomes), cacheURL: url, catalog: catalog)
+        #expect(GuestBootFixCache.pendingIDs(cacheURL: url, catalog: catalog) == [])
+    }
+
     @Test("Factory baselines come from the image; a replacement disk cannot inherit history")
     func factoryAndReset() throws {
         let catalog = try migrationCatalogFixture()

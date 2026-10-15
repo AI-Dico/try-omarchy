@@ -29,16 +29,21 @@ struct GuestBootFixReport: Codable, Equatable {
         ["checking", "running"].contains(state) || needsAttention
     }
 
-    static func decode(_ data: Data, catalog: GuestBootFixCatalog? = .bundled) throws -> Self {
+    static func decode(_ data: Data, catalog: GuestBootFixCatalog? = .bundled, historical: Bool = false) throws -> Self {
         guard data.count <= 4096 else { throw HelperError.io("boot fixes report exceeds limit") }
         let value = try JSONDecoder().decode(Self.self, from: data)
+        let knownSets = [Set(catalog?.componentIDs ?? []), Set(legacyComponentNames),
+                         Set(legacyComponentNames.filter { $0 != "ghostty" }),
+                         Set(["clipboard", "screensaver", "alacritty"])]
+        let validHistoricalIDs = historical && value.components.count <= 32 && value.components.keys.allSatisfy {
+            $0.range(of: "^[a-z][a-z0-9-]{0,47}$", options: .regularExpression) != nil
+        }
         guard value.schema == 1, value.type == "boot-fixes",
               !value.components.isEmpty,
               value.identity.count == 64,
               value.identity.allSatisfy({ "0123456789abcdef".contains($0) }),
               ["checking", "running", "complete", "skipped", "failed", "recovery-required", "unconfirmed"].contains(value.state),
-              [Set(catalog?.componentIDs ?? []), Set(legacyComponentNames), Set(legacyComponentNames.filter { $0 != "ghostty" }),
-               Set(["clipboard", "screensaver", "alacritty"])].contains(Set(value.components.keys)),
+              knownSets.contains(Set(value.components.keys)) || validHistoricalIDs,
               value.components.values.allSatisfy({ ["current", "applied", "preserved", "unavailable", "pending", "failed"].contains($0) }),
               value.state != "complete" || !value.components.values.contains(where: { ["pending", "failed"].contains($0) })
         else { throw HelperError.io("invalid boot fixes report") }
@@ -135,6 +140,7 @@ struct GuestBootFixResult {
 struct GuestBootFixCache: Codable {
     let checkedAt: Date
     let report: GuestBootFixReport
+    var revisions: [String: Int]? = nil
 
     static var bundledIdentity: String? {
         guard let url = Bundle.main.resourceURL?.appendingPathComponent("guest-settings/fixes.json"),
@@ -150,8 +156,12 @@ struct GuestBootFixCache: Codable {
               let attributes = try? FileManager.default.attributesOfItem(
                 atPath: (diskURL ?? storageRoot.appendingPathComponent("disks/current/rootfs.ext4")).path),
               attributes[.type] as? FileAttributeType == .typeRegular,
-              let inode = attributes[.systemFileNumber] as? NSNumber else { return nil }
-        return storageRoot.appendingPathComponent("boot-fixes-\(inode.uint64Value).json")
+              let inode = attributes[.systemFileNumber] as? NSNumber,
+              let created = attributes[.creationDate] as? Date else { return nil }
+        // Inodes can be reused after Reset. Birth time gives the replacement
+        // disk a fresh history even if its inode happens to be identical.
+        let generation = String(created.timeIntervalSince1970.bitPattern, radix: 16)
+        return storageRoot.appendingPathComponent("boot-fixes-\(generation)-\(inode.uint64Value).json")
     }
 
     static func read(_ url: URL?) -> Self? {
@@ -159,14 +169,23 @@ struct GuestBootFixCache: Codable {
               attributes[.type] as? FileAttributeType == .typeRegular,
               let size = attributes[.size] as? NSNumber, size.intValue > 0, size.intValue <= 8192,
               let data = try? Data(contentsOf: url), let value = try? JSONDecoder().decode(Self.self, from: data),
-              (try? GuestBootFixReport.decode(JSONEncoder().encode(value.report))) != nil else { return nil }
+              (try? GuestBootFixReport.decode(JSONEncoder().encode(value.report), historical: true)) != nil,
+              value.revisions.map({ revisions in
+                  revisions.count <= 32 && revisions.allSatisfy {
+                      $0.key.range(of: "^[a-z][a-z0-9-]{0,47}$", options: .regularExpression) != nil
+                          && (1...65535).contains($0.value)
+                  }
+              }) ?? true else { return nil }
         return value
     }
 
     static func needsUpdate(cacheURL: URL?, expectedIdentity: String?) -> Bool {
-        // Existing disks review a new bundle before their first boot with it.
-        // A matching result can establish that its fixes are already current.
+        // Revision receipts survive bundle changes; legacy reports are only a
+        // fallback until the disk's one-time inspection establishes a baseline.
         guard cacheURL != nil, let expectedIdentity else { return false }
+        if let catalog = GuestBootFixCatalog.bundled, let pending = pendingIDs(cacheURL: cacheURL, catalog: catalog) {
+            return !pending.isEmpty
+        }
         guard let cache = read(cacheURL), cache.report.identity == expectedIdentity else { return true }
         if let catalog = GuestBootFixCatalog.bundled, !cache.report.matchesComponents(in: catalog) { return true }
         return cache.report.needsUpdate
@@ -193,12 +212,42 @@ struct GuestBootFixCache: Codable {
         try Data().write(to: reviewURL(cacheURL: cacheURL, identity: identity), options: .atomic)
     }
 
-    static func retain(_ report: GuestBootFixReport, cacheURL: URL?) throws {
+    static func seedFactory(storageRoot: URL, diskURL: URL, provenanceURL: URL,
+                            catalog: GuestBootFixCatalog, identity: String) throws {
+        struct Provenance: Decodable { let migrationRevisions: [String: Int]? }
+        let provenance = try JSONDecoder().decode(Provenance.self, from: Data(contentsOf: provenanceURL))
+        guard let revisions = provenance.migrationRevisions,
+              revisions.count <= 32,
+              revisions.values.allSatisfy({ (1...65535).contains($0) }),
+              let url = url(storageRoot: storageRoot, diskURL: diskURL) else { return }
+        let components = Dictionary(uniqueKeysWithValues: catalog.migrations.map {
+            ($0.id, (revisions[$0.id] ?? 0) >= $0.revision ? "current" : "pending")
+        })
+        let report = GuestBootFixReport(schema: 1, type: "boot-fixes", identity: identity,
+            state: components.values.contains("pending") ? "skipped" : "complete", components: components)
+        let value = Self(checkedAt: Date(), report: report, revisions: revisions)
+        try JSONEncoder().encode(value).write(to: url, options: .atomic)
+    }
+
+    static func pendingIDs(cacheURL: URL?, catalog: GuestBootFixCatalog) -> Set<String>? {
+        guard let revisions = read(cacheURL)?.revisions else { return nil }
+        return Set(catalog.migrations.filter { (revisions[$0.id] ?? 0) < $0.revision }.map(\.id))
+    }
+
+    static func retain(_ report: GuestBootFixReport, cacheURL: URL?,
+                       catalog: GuestBootFixCatalog? = .bundled) throws {
         guard let cacheURL else { return }
         if let previous = read(cacheURL), previous.report.updateWasAttempted {
             try recordReview(cacheURL: cacheURL, identity: previous.report.identity)
         }
-        let value = Self(checkedAt: Date(), report: report)
+        var value = Self(checkedAt: Date(), report: report, revisions: read(cacheURL)?.revisions)
+        if let catalog, report.matchesComponents(in: catalog), ["complete", "skipped"].contains(report.state) {
+            var revisions = (value.revisions ?? [:]).filter { catalog.revisions[$0.key] != nil }
+            for migration in catalog.migrations where ["current", "applied", "preserved", "unavailable"].contains(report.components[migration.id] ?? "") {
+                revisions[migration.id] = max(revisions[migration.id] ?? 0, migration.revision)
+            }
+            value.revisions = revisions
+        }
         try JSONEncoder().encode(value).write(to: cacheURL, options: .atomic)
     }
 
@@ -224,5 +273,24 @@ enum GuestBootFixLaunchGate {
         case .cancel: return .cancel
         case .skip: return confirmSkip() ? .skip : .cancel
         }
+    }
+}
+
+/// Inspection results establish history, never grant permission to change a VM.
+enum GuestMigrationInspection {
+    static func read(output: URL, identity: String, catalog: GuestBootFixCatalog) throws -> GuestBootFixReport {
+        let url = output.appendingPathComponent("report.json")
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              let size = attributes[.size] as? NSNumber, (1...4096).contains(size.intValue) else {
+            throw HelperError.io("The VM returned an invalid migration inspection report")
+        }
+        let data = try Data(contentsOf: url)
+        let report = try GuestBootFixReport.decode(data, catalog: catalog)
+        guard report.identity == identity, report.matchesComponents(in: catalog),
+              ["complete", "skipped"].contains(report.state) else {
+            throw HelperError.io("The VM migration check could not establish a baseline. Try launching again.")
+        }
+        return report
     }
 }

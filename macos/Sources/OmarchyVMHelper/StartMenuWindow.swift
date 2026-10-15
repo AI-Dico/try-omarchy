@@ -439,8 +439,10 @@ final class StartMenuWindow: NSObject, NSWindowDelegate {
             alert.runModal()
             return .cancel
         }
+        guard let pending = GuestBootFixCache.pendingIDs(cacheURL: bootFixCacheURL(), catalog: catalog),
+              !pending.isEmpty else { return .cancel }
         return GuestBootFixLaunchGate.decide(review: {
-            switch GuestBootFixPrompt.review(catalog: catalog).runModal() {
+            switch GuestBootFixPrompt.review(catalog: catalog.selecting(pending)).runModal() {
             case .alertFirstButtonReturn: return .update
             case .alertSecondButtonReturn: return .skip
             default: return .cancel

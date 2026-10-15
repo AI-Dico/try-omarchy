@@ -58,7 +58,7 @@ LINKS = {
     'etc/systemd/system/multi-user.target.wants/try-omarchy-integrations.service': '/usr/lib/systemd/system/try-omarchy-integrations.service',
     'var/lib/dkms/try-omarchy-battery/1.3.0/source': '/usr/src/try-omarchy-battery-1.3.0',
 }
-EXTRA_FILES = {'omarchy-lock-password', 'repair-update-holds.py', 'components.py',
+EXTRA_FILES = {'migration-check.service', 'omarchy-lock-password', 'repair-update-holds.py', 'components.py',
                'preimages.json', 'user-fixes.py', 'pinch-input.lua', 'power-profile-hooks.json', 'catalog.json',
                'japanese-input.py', 'profile-chewing.ini', 'profile-korean.ini',
                'fcitx5-profile.ini', 'fcitx5-jis-config.ini', 'apple-keyboard-input.lua'}
@@ -644,6 +644,7 @@ def package(guest, payload):
             (payload / name).chmod(mode)
     for name, source in {
         'components.py': guest / 'scripts/boot-fix-components.py',
+        'migration-check.service': guest.parent / 'macos/migration-check.service',
         'repair-update-holds.py': guest / 'scripts/repair-update-holds.py',
         'user-fixes.py': guest / 'scripts/migrate-user-fixes.py',
         'preimages.json': guest / 'migrations/preimages.json',

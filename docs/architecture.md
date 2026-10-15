@@ -384,9 +384,12 @@ change. Factory reset remains the way to opt into the complete new factory.
 
 Compatible stock-file fixes use a separate consent-gated boot runner in the
 app's settings payload. The launcher reviews the update and binds approval to
-the selected disk and exact fix bundle. Existing disks without a matching result
-offer Update before their first boot with the new bundle; Skip Launcher pauses
-for that first review. The temporary guest service journals,
+the selected disk and exact fix bundle. Existing disks without migration revision history receive one headless check in
+a disposable overlay before their first review. The launcher then offers only
+new, revised, or unfinished migrations; subsequent app updates compare per-disk
+revision receipts without another inspection boot. Fresh disks seed their history
+from factory provenance, including after Reset. Skip Launcher pauses for the
+first review of pending work. The temporary guest service journals,
 applies, and verifies the [reviewed manual-command migrations](integration-updates.md#manual-upgrade-commands-covered-by-update)
 before graphical login; it restores originals on failure
 and recovers interrupted file transactions even when the next launch skips

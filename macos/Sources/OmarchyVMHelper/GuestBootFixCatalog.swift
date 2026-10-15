@@ -21,6 +21,20 @@ struct GuestBootFixCatalog: Decodable {
     let groups: [String: Feature]
     let migrations: [Migration]
 
+    func selecting(_ ids: Set<String>) -> Self {
+        let selected = migrations.filter { ids.contains($0.id) }.map { migration in
+            guard let group = migration.group,
+                  !migrations.filter({ $0.group == group }).allSatisfy({ ids.contains($0.id) }) else { return migration }
+            // A partial group should name only the work being reviewed.
+            return Migration(id: migration.id, revision: migration.revision, title: migration.title,
+                             icon: migration.icon, group: nil, note: migration.note)
+        }
+        let used = Set(selected.compactMap(\.group))
+        return Self(schema: schema, groups: groups.filter { used.contains($0.key) }, migrations: selected)
+    }
+
+    var revisions: [String: Int] { Dictionary(uniqueKeysWithValues: migrations.map { ($0.id, $0.revision) }) }
+
     var componentIDs: [String] { migrations.map(\.id) }
 
     var features: [Feature] {

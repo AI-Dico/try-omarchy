@@ -475,7 +475,7 @@ def _self():
         ('snapshot', 'replacement', 'digest', 'journal_path')})
 
 
-def boot(payload):
+def boot(payload, inspect=False):
     identity = None
     def emit(value):
         print("Try Omarchy boot fixes: " + json.dumps(value), flush=True)
@@ -495,7 +495,7 @@ def boot(payload):
         catalog = components(payload).read_catalog(payload / 'catalog.json')
         component_ids = tuple(entry['id'] for entry in catalog['migrations'])
         identity = bundle_manifest(payload)["identity"]
-        approved = f"tryomarchy.fixes={identity}" in cmdline.split()
+        approved = not inspect and f"tryomarchy.fixes={identity}" in cmdline.split()
         def restart(result):
             os.execve('/usr/bin/python3', ['/usr/bin/python3', str(payload / 'install.py')],
                       {**os.environ, '_TRY_OMARCHY_JAPANESE_RESULT': result})
@@ -511,5 +511,7 @@ def boot(payload):
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--manifest":
         bundle_manifest(Path(sys.argv[2]), create=True)
+    elif sys.argv[1:] == ["--inspect"] and os.geteuid() == 0:
+        boot(Path(__file__).resolve().parent, inspect=True)
     else:
         raise SystemExit("This runner is invoked by the app's boot settings payload")

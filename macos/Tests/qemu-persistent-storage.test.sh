@@ -378,11 +378,13 @@ expanded_bytes=$((source_bytes + 16384))
 qemu_persistent_storage_select \
   persistent "$identity_expanded" "$source_disk" "$source_sha" "$source_bytes" '' "$expanded_bytes"
 expanded_disk=$QEMU_SELECTED_DISK
+assert_eq "$QEMU_SELECTED_DISK_CREATED" 1
 assert_eq "$(/usr/bin/stat -f '%z' "$expanded_disk")" "$expanded_bytes"
 printf 'expanded-persistence' | dd of="$expanded_disk" bs=1 seek="$source_bytes" conv=notrunc >/dev/null 2>&1
 qemu_persistent_storage_release_lock
 qemu_persistent_storage_select \
   persistent "$identity_expanded" "$source_disk" "$source_sha" "$source_bytes" '' "$expanded_bytes"
+assert_eq "$QEMU_SELECTED_DISK_CREATED" 0
 assert_eq "$(dd if="$QEMU_SELECTED_DISK" bs=1 skip="$source_bytes" count=20 2>/dev/null)" expanded-persistence
 qemu_persistent_storage_release_lock
 
@@ -523,6 +525,7 @@ assert_eq "$(dd if="$symlink_boot_disk" bs=1 skip=576 count=17 2>/dev/null)" sym
 qemu_persistent_storage_select \
   reset "$identity_b" "$source_disk_b" "$source_sha_b" "$source_bytes_b" '' \
   "$source_bytes_b" "$kernel_b" "$initramfs_b" "$kernel_command_line_b"
+assert_eq "$QEMU_SELECTED_DISK_CREATED" 1
 assert cmp -s "$QEMU_SELECTED_DISK" "$source_disk_b"
 assert cmp -s "$QEMU_SELECTED_KERNEL" "$kernel_b"
 assert cmp -s "$QEMU_SELECTED_INITRAMFS" "$initramfs_b"

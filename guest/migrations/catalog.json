@@ -13,10 +13,10 @@
   "migrations": [
     {
       "id": "japanese-input",
-      "revision": 4,
+      "revision": 5,
       "title": "Japanese input",
       "icon": "keyboard",
-      "note": "Installs missing Japanese input packages without upgrading other packages. Downloads need internet; installed packages are kept if another fix fails."
+      "note": "Installs missing Japanese input packages using existing repository data. If a system update is needed, run omarchy update inside the VM first. Downloads need internet; installed packages are kept if another fix fails."
     },
     {
       "id": "battery",

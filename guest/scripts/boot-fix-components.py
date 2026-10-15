@@ -298,7 +298,7 @@ def japanese_available(root):
 
 
 def install_japanese(root):
-    """Install only the missing Japanese input packages, without a system upgrade."""
+    """Use the existing package snapshot; leave system updates to Omarchy."""
     missing = missing_japanese(root)
     if not missing:
         return 'current'
@@ -306,16 +306,25 @@ def install_japanese(root):
         return 'unavailable'
     if (root / 'var/lib/pacman/db.lck').exists():
         return 'unavailable'
+    holds = load('japanese_update_holds', Path(__file__).with_name('repair-update-holds.py')).HOLDS
+    protected = (*holds, 'try-omarchy-runtime')
+    # A refreshed database with older installed libraries is a partial-upgrade
+    # hazard: package dependencies do not always encode the required Qt ABI.
+    # Never refresh here or silently broaden this migration to a system update.
+    upgrades = run(['pacman', '-Quq'], check=False)
+    if upgrades.returncode not in (0, 1) or upgrades.stderr.strip():
+        raise RuntimeError('Could not check pending system updates')
+    if set(upgrades.stdout.split()) - set(protected):
+        print('Japanese input setup needs a system update. Run omarchy update inside the VM first.',
+              file=sys.stderr, flush=True)
+        return 'unavailable'
     # Networking normally starts alongside the boot payload. Ensure the vendor
     # service has started before attempting the bounded download.
     run(['systemctl', 'start', 'NetworkManager.service'], timeout=15)
     run(['nm-online', '-q', '-t', '15'], timeout=20)
-    holds = load('japanese_update_holds', Path(__file__).with_name('repair-update-holds.py')).HOLDS
-    ignored = ','.join((*holds, 'try-omarchy-runtime'))
-    # Refresh without -u: mirrors drop superseded packages, so a stale database
-    # cannot download them. Installed packages are upgraded only when pacman's
-    # dependency resolution requires it.
-    run(['pacman', '-Sy', '--needed', '--noconfirm', '--ignore', ignored, *missing], timeout=300)
+    # If a mirror no longer has this snapshot's packages, fail without refreshing
+    # or retrying against newer packages. The user can update through Omarchy.
+    run(['pacman', '-S', '--needed', '--noconfirm', '--ignore', ','.join(protected), *missing], timeout=300)
     if not japanese_available(root):
         raise RuntimeError('Japanese input installation could not be verified')
     return 'applied'

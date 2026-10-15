@@ -581,11 +581,11 @@ and profile. To switch groups manually, run `fcitx5-remote -g Korean` or
 ### Japanese input
 
 Follow the [native Omarchy workflow](https://omarchy.org/manual/keyboard-mouse-trackpad/#typing-in-chinese-japanese-and-other-languages)
-**inside the VM**. New VMs include the required packages; on older VMs, install
-them if missing:
+**inside the VM**. New VMs include the required packages; on older VMs, complete
+the normal system update before installing missing packages:
 
 ```sh
-omarchy pkg add fcitx5-mozc fcitx5-configtool
+omarchy update && omarchy pkg add fcitx5-mozc fcitx5-configtool
 ```
 
 Open **Fcitx 5 Configuration** from the application launcher, or run

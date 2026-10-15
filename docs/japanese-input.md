@@ -58,10 +58,12 @@ including when migrations are skipped. It does not require Mozc. See
 choice. When any of the factory's Japanese input packages are missing
 (`fcitx5`, `fcitx5-mozc`, `fcitx5-gtk`, `fcitx5-qt`, `fcitx5-configtool`,
 `noto-fonts-cjk`), the approved migration installs only those packages with
-`pacman -Sy --needed --noconfirm`, using the guest's existing package
-repositories and signature policy. It refreshes repository data so current
-packages can be downloaded, but does not upgrade the rest of the system;
-installed packages change only when pacman's dependency resolution requires it.
+`pacman -S --needed --noconfirm`, using the guest's existing repository databases
+and signature policy. It does not refresh those databases or run a system
+upgrade. If the databases show ordinary installed packages awaiting an update,
+installation is skipped; run `omarchy update` inside the VM first. Project-held
+packages are excluded from this check. If a mirror no longer has the recorded
+package versions, installation fails without refreshing and retrying.
 The command holds the project's kernel, headers, runtime, and validated Hyprland
 stack, in addition to the guest's existing holds. The migration waits briefly
 for networking and bounds the package operation to five minutes. Guests that
@@ -112,6 +114,20 @@ check that `~/.config/chromium-flags.conf` includes `--enable-wayland-ime` along
 its existing flags. Native GTK4/Qt6 applications use Wayland text-input-v3; do not
 force global `GTK_IM_MODULE` or `QT_IM_MODULE` overrides onto them. XWayland
 applications still require `XMODIFIERS=@im=fcitx`, supplied by the factory.
+
+### Qt library errors in the configuration tool
+
+An error such as `version Qt_6.12 not found` means the installed Qt and KDE
+libraries are from different package versions. Older Japanese-input migrations
+could cause this by refreshing repositories with `pacman -Sy` and installing
+selected packages without updating the rest of the system. Arch does not support
+[partial upgrades](https://wiki.archlinux.org/title/System_maintenance#Partial_upgrades_are_unsupported).
+
+Inside Omarchy, run `omarchy update` and let it finish successfully, then reopen
+`fcitx5-configtool`. The normal updater retains Try Omarchy's package holds.
+If the update fails, resolve that error before installing more packages; keep
+the holds in place. A migration result based on installed package records alone
+does not verify that the configuration tool can start.
 
 ## Verification
 

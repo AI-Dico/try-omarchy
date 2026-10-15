@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -390,22 +391,52 @@ class JapaneseMigrationTests(unittest.TestCase):
             self.assertEqual([], extras.missing_japanese(root))
             self.assertTrue(extras.japanese_available(root))
 
-    def test_installs_only_missing_packages_without_a_system_upgrade(self):
+    def test_installs_missing_packages_without_refreshing_or_upgrading_the_system(self):
         with patch.object(extras, 'missing_japanese', side_effect=[['fcitx5-mozc', 'fcitx5-configtool'], []]), \
                 patch.object(Path, 'is_file', return_value=True), \
-                patch.object(Path, 'exists', return_value=False), patch.object(extras, 'run') as run:
+                patch.object(Path, 'exists', return_value=False), \
+                patch.object(extras, 'run', return_value=subprocess.CompletedProcess([], 1, '', '')) as run:
             self.assertEqual('applied', extras.install_japanese(Path('/')))
-        self.assertEqual(['systemctl', 'start', 'NetworkManager.service'], run.call_args_list[0].args[0])
-        self.assertEqual(['nm-online', '-q', '-t', '15'], run.call_args_list[1].args[0])
-        self.assertEqual(['pacman', '-Sy', '--needed', '--noconfirm', '--ignore',
+        self.assertEqual(['pacman', '-Quq'], run.call_args_list[0].args[0])
+        self.assertEqual(['systemctl', 'start', 'NetworkManager.service'], run.call_args_list[1].args[0])
+        self.assertEqual(['nm-online', '-q', '-t', '15'], run.call_args_list[2].args[0])
+        self.assertEqual(['pacman', '-S', '--needed', '--noconfirm', '--ignore',
                           'linux-aarch64,linux-aarch64-headers,hyprland,aquamarine,hyprtoolkit,hyprland-guiutils,try-omarchy-runtime',
-                          'fcitx5-mozc', 'fcitx5-configtool'], run.call_args_list[2].args[0])
-        self.assertLessEqual(run.call_args_list[2].kwargs['timeout'], 300)
+                          'fcitx5-mozc', 'fcitx5-configtool'], run.call_args_list[3].args[0])
+        self.assertLessEqual(run.call_args_list[3].kwargs['timeout'], 300)
+
+    def test_outdated_qt_defers_installation_to_the_native_system_updater(self):
+        with patch.object(extras, 'missing_japanese', return_value=['fcitx5-configtool']), \
+                patch.object(Path, 'is_file', return_value=True), \
+                patch.object(Path, 'exists', return_value=False), \
+                patch.object(extras, 'run', return_value=subprocess.CompletedProcess([], 0, 'qt6-base\n', '')) as run:
+            self.assertEqual('unavailable', extras.install_japanese(Path('/')))
+            run.assert_called_once_with(['pacman', '-Quq'], check=False)
+
+    def test_project_holds_do_not_require_upgrading_the_pinned_stack(self):
+        with patch.object(extras, 'missing_japanese', side_effect=[['fcitx5-mozc'], []]), \
+                patch.object(Path, 'is_file', return_value=True), \
+                patch.object(Path, 'exists', return_value=False), \
+                patch.object(extras, 'run', return_value=subprocess.CompletedProcess([], 0, 'linux-aarch64\nhyprland\n', '')):
+            self.assertEqual('applied', extras.install_japanese(Path('/')))
+
+    def test_failed_package_query_cannot_authorize_installation(self):
+        for result in (subprocess.CompletedProcess([], 2, '', 'query failed'),
+                       subprocess.CompletedProcess([], 1, '', 'missing repository database')):
+            with self.subTest(result=result), \
+                    patch.object(extras, 'missing_japanese', return_value=['fcitx5-mozc']), \
+                    patch.object(Path, 'is_file', return_value=True), \
+                    patch.object(Path, 'exists', return_value=False), \
+                    patch.object(extras, 'run', return_value=result) as run:
+                with self.assertRaisesRegex(RuntimeError, 'pending system updates'):
+                    extras.install_japanese(Path('/'))
+                run.assert_called_once_with(['pacman', '-Quq'], check=False)
 
     def test_unverified_installation_is_reported_as_a_failure(self):
         with patch.object(extras, 'missing_japanese', return_value=['fcitx5-mozc']), \
                 patch.object(Path, 'is_file', return_value=True), \
-                patch.object(Path, 'exists', return_value=False), patch.object(extras, 'run'):
+                patch.object(Path, 'exists', return_value=False), \
+                patch.object(extras, 'run', return_value=subprocess.CompletedProcess([], 1, '', '')):
             with self.assertRaises(RuntimeError):
                 extras.install_japanese(Path('/'))
 

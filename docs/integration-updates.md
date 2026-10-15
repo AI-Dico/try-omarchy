@@ -117,7 +117,10 @@ continue to recognize it.
 The Japanese-input migration installs only missing Japanese input packages
 (Mozc, Fcitx5 and its GTK/Qt modules, its configuration tool, and CJK fonts) and
 their required dependencies from the guest's configured package repositories.
-Repository databases are refreshed, but other packages are not upgraded. Kernel,
+Repository databases are not refreshed. If they show pending updates to ordinary
+installed packages, installation is skipped until the user completes
+`omarchy update` inside the VM. Missing mirror files fail without a refresh/retry.
+This avoids selectively installing newer dependencies into an older system. Kernel,
 headers, runtime, and the validated Hyprland stack are explicitly held. Guests
 that already have every package make no package changes.
 The package operation is bounded to five minutes. Package installations are kept when later file changes are restored.

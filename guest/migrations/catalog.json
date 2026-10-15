@@ -12,6 +12,13 @@
   },
   "migrations": [
     {
+      "id": "japanese-input",
+      "revision": 3,
+      "title": "Japanese input",
+      "icon": "keyboard",
+      "note": "Installs missing Japanese input packages without upgrading other packages. Downloads need internet; installed packages are kept if another fix fails."
+    },
+    {
       "id": "battery",
       "revision": 1,
       "title": "Battery widget",

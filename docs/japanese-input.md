@@ -50,11 +50,46 @@ fails.
 
 ## Existing guests
 
-Installing a new Mac app does not replace the saved guest's packages or home
-configuration. Enable Japanese input inside that guest without a factory reset:
+Physical ANSI/ISO/JIS keyboard support is installed automatically at boot,
+including when migrations are skipped. It does not require Mozc. See
+[Mac keyboard](mac-keyboard.md#existing-vms).
+
+**Update and Launch** includes the Japanese input migration; it is not a separate
+choice. When any of the factory's Japanese input packages are missing
+(`fcitx5`, `fcitx5-mozc`, `fcitx5-gtk`, `fcitx5-qt`, `fcitx5-configtool`,
+`noto-fonts-cjk`), the approved migration installs only those packages with
+`pacman -Sy --needed --noconfirm`, using the guest's existing package
+repositories and signature policy. It refreshes repository data so current
+packages can be downloaded, but does not upgrade the rest of the system;
+installed packages change only when pacman's dependency resolution requires it.
+The command holds the project's kernel, headers, runtime, and validated Hyprland
+stack, in addition to the guest's existing holds. The migration waits briefly
+for networking and bounds the package operation to five minutes. Guests that
+already have every package make no package changes.
+
+After installation, it migrates recognized stock Fcitx profiles, including
+profiles saved after first login. Mozc becomes the first conversion engine on
+JIS Macs, for a Japanese guest language, or when the Mac's primary language is
+Japanese. Older guests keep an English locale, so the app reports the Mac's
+language separately as `tryomarchy.mac_language=`; it never changes `LANG`.
+Other guests gain Mozc after Chewing. When Mozc becomes first, the Fcitx keyboard
+item follows the guest's layout (`XKBLAYOUT` in `/etc/vconsole.conf`, which
+Omarchy's Hyprland config also reads), as on new guests. Mozc chooses its kana
+table from that layout, so a `jp` layout keeps ろ and ¥ correct in kana input.
+Korean group selection is preserved. Native
+英数/かな shortcuts are seeded only when global Fcitx config is missing.
+Personal profiles, shortcuts, and unsafe paths are preserved and reported.
+
+Skipping performs no package installation or Japanese-profile edits. Interrupted
+file changes are recovered before a retry. Package installation is a separate
+pacman transaction: installed packages remain if a later file repair fails.
+An active package-manager lock is preserved. Download or verification failures
+are reported and normal VM boot continues; check connectivity, then retry **Update and Launch**.
+Guest language, kernel, and paired boot files are retained.
+
+For preserved personal settings, use the configuration tool to finish setup:
 
 ```sh
-sudo pacman -Syu fcitx5 fcitx5-mozc fcitx5-configtool fcitx5-gtk fcitx5-qt noto-fonts-cjk
 fcitx5-configtool
 ```
 

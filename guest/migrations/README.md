@@ -47,8 +47,43 @@ VMs that already received revision 1 while preserving customized pins.
 The app's fix manifest covers these inputs, the runner, component planners,
 user planner, and exact integration bundle. Add future repairs only with their
 reviewed preimages, destination allowlist, dependencies, journal recovery, and
-per-component result. Package/kernel updates and biometric enablement are
-separate workflows.
+per-component result. Kernel replacement and biometric enablement are separate
+workflows. The Japanese-input package transaction below is outside file recovery.
+
+`japanese-input` revision 3 installs only the missing factory Japanese input
+packages after approval (`JAPANESE_PACKAGES` in `boot-fix-components.py`,
+checked against pacman's local database), through a five-minute
+`pacman -Sy --needed --noconfirm` transaction. Revision 2 ran a full `-Syu`
+system upgrade instead. The database refresh is required because mirrors drop
+superseded packages; without `-u`, other installed packages change only when
+dependency resolution requires it. It uses the existing guest repositories and
+signature policy. `--ignore` includes the canonical
+compatibility holds from `repair-update-holds.py` and `try-omarchy-runtime`. The
+file planners run after pacman so their preimages match the updated guest.
+The boot installer re-executes the installed Python after the package attempt,
+carrying its advisory result in process environment so the transaction is not
+repeated that boot. Bundle and boot-token consent are verified again after exec.
+Pacman manages dependencies and package recovery; installed packages are not
+rolled back by the file journal. Installed packages and
+active package locks are preserved. Failures are reported for manual retry.
+
+Physical ANSI/ISO/JIS support is now delivered automatically by the settings
+installer, independently of approval and packages. Its older overlay preimage
+is from `fc108341`; unknown overlays and explicit user keyboard models are
+preserved. The destination and user input path remain in recovery allowlists
+so interrupted revision 1 journals can be restored before automatic installation.
+
+`japanese-input/profile-chewing.ini` and `profile-korean.ini` are the exact
+factory seeds from `c6c2cc0` and `3e9f720`. The user planner recognizes their INI
+values and the current seed, including Fcitx's saved DefaultIM and Korean-first
+GroupOrder, while rejecting additional settings and custom engine lists.
+It adds Mozc without changing the selected group. When Mozc becomes first (JIS,
+Japanese `LANG`, or `tryomarchy.mac_language=ja` from the launcher), the Default
+group's keyboard follows `XKBLAYOUT` from `/etc/vconsole.conf`, like the factory
+initializer; otherwise the direct-input keyboard is unchanged.
+JIS hotkeys are seeded only when global config is missing; existing shortcuts
+are preserved. Home changes run as the owner in the user transaction journal.
+The migration does not change locale or enable a disabled input-method service.
 
 The `shell-qtquick` migration pins stock shell QML imports to `QtQuick 6.11`.
 Qt 6.12 adds a `Color` singleton that shadows Omarchy's palette.

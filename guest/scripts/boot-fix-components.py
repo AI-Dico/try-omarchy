@@ -59,9 +59,11 @@ LINKS = {
     'var/lib/dkms/try-omarchy-battery/1.3.0/source': '/usr/src/try-omarchy-battery-1.3.0',
 }
 EXTRA_FILES = {'omarchy-lock-password', 'repair-update-holds.py', 'components.py',
-               'preimages.json', 'user-fixes.py', 'pinch-input.lua', 'power-profile-hooks.json', 'catalog.json'}
+               'preimages.json', 'user-fixes.py', 'pinch-input.lua', 'power-profile-hooks.json', 'catalog.json',
+               'japanese-input.py', 'profile-chewing.ini', 'profile-korean.ini',
+               'fcitx5-profile.ini', 'fcitx5-jis-config.ini', 'apple-keyboard-input.lua'}
 HANDLED_COMPONENTS = frozenset(GROUPS) | {'clipboard', 'screensaver', 'alacritty',
-                                        'power', 'holds', 'lock', 'integrations', 'desktop', 'shell-qtquick'}
+                                        'power', 'holds', 'lock', 'integrations', 'desktop', 'shell-qtquick', 'japanese-input'}
 SHELL_TARGETS = frozenset({
     'usr/share/omarchy/shell/Commons/Border.qml',
     'usr/share/omarchy/shell/Commons/Color.qml',
@@ -171,6 +173,8 @@ POWER_TARGETS = {'usr/bin/omarchy-powerprofiles-list', 'usr/bin/omarchy-powerpro
                  'usr/share/omarchy/shell/plugins/panels/power/Model.js',
                  'usr/share/omarchy/shell/plugins/menu/Menu.qml'}
 FIXED_TARGETS = {p for group in GROUPS.values() for p, _ in group.values()} | set(LINKS) | POWER_TARGETS | SHELL_TARGETS | {
+    # Retain recovery support for revision 1's keyboard transaction.
+    'usr/share/try-omarchy/apple-keyboard-input.lua',
     'etc/pam.d/omarchy-lock-password', 'etc/pacman.conf', 'usr/share/try-omarchy/pacman.conf',
     'usr/local/bin/try-omarchy-integrations', 'usr/lib/systemd/system/try-omarchy-integrations.service',
 }
@@ -272,6 +276,49 @@ def allowed_link(relative, value):
 def run(args, check=True, timeout=20):
     return subprocess.run(args, check=check, capture_output=True, text=True, timeout=timeout,
                           env={**os.environ, 'PATH': '/usr/local/sbin:/usr/local/bin:/usr/bin:/bin'})
+
+
+# The factory's Japanese input stack: engine, GTK/Qt modules, settings, and fonts.
+JAPANESE_PACKAGES = ('fcitx5', 'fcitx5-mozc', 'fcitx5-gtk', 'fcitx5-qt', 'fcitx5-configtool', 'noto-fonts-cjk')
+
+
+def missing_japanese(root):
+    """Japanese input packages absent from pacman's local database."""
+    installed = set()
+    local = root / 'var/lib/pacman/local'
+    for desc in local.glob('*/desc') if local.is_dir() else ():
+        lines = desc.read_text(errors='replace').splitlines()
+        if '%NAME%' in lines[:-1]:
+            installed.add(lines[lines.index('%NAME%') + 1])
+    return [name for name in JAPANESE_PACKAGES if name not in installed]
+
+
+def japanese_available(root):
+    return not missing_japanese(root)
+
+
+def install_japanese(root):
+    """Install only the missing Japanese input packages, without a system upgrade."""
+    missing = missing_japanese(root)
+    if not missing:
+        return 'current'
+    if root != Path('/') or not (root / 'usr/bin/pacman').is_file():
+        return 'unavailable'
+    if (root / 'var/lib/pacman/db.lck').exists():
+        return 'unavailable'
+    # Networking normally starts alongside the boot payload. Ensure the vendor
+    # service has started before attempting the bounded download.
+    run(['systemctl', 'start', 'NetworkManager.service'], timeout=15)
+    run(['nm-online', '-q', '-t', '15'], timeout=20)
+    holds = load('japanese_update_holds', Path(__file__).with_name('repair-update-holds.py')).HOLDS
+    ignored = ','.join((*holds, 'try-omarchy-runtime'))
+    # Refresh without -u: mirrors drop superseded packages, so a stale database
+    # cannot download them. Installed packages are upgraded only when pacman's
+    # dependency resolution requires it.
+    run(['pacman', '-Sy', '--needed', '--noconfirm', '--ignore', ignored, *missing], timeout=300)
+    if not japanese_available(root):
+        raise RuntimeError('Japanese input installation could not be verified')
+    return 'applied'
 
 
 def load(name, path):
@@ -461,6 +508,8 @@ def plan(fixes, payload, root, uid):
         except (OSError, RuntimeError, ValueError):
             preserved = True
     outcomes['shell-qtquick'] = 'pending' if pending else 'preserved' if preserved else 'current'
+    outcomes['japanese-input'] = ('current' if japanese_available(root) else
+                                 'pending' if (root / 'usr/bin/pacman').is_file() else 'unavailable')
     return changes, outcomes
 
 
@@ -601,6 +650,12 @@ def package(guest, payload):
         'catalog.json': guest / 'migrations/catalog.json',
         'omarchy-lock-password': guest / 'migrations/omarchy-lock-password',
         'pinch-input.lua': guest / 'native-overlay/usr/share/try-omarchy/pinch-input.lua',
+        'apple-keyboard-input.lua': guest / 'native-overlay/usr/share/try-omarchy/apple-keyboard-input.lua',
+        'japanese-input.py': guest / 'scripts/migrate-japanese-input.py',
+        'profile-chewing.ini': guest / 'migrations/japanese-input/profile-chewing.ini',
+        'profile-korean.ini': guest / 'migrations/japanese-input/profile-korean.ini',
+        'fcitx5-profile.ini': guest / 'fragments/fcitx5-profile.ini',
+        'fcitx5-jis-config.ini': guest / 'fragments/fcitx5-jis-config.ini',
     }.items():
         shutil.copy2(source, payload / name)
     builder = load('integration_builder', guest.parent / 'integrations/build-bundle.py')

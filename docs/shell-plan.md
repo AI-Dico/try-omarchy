@@ -1,8 +1,9 @@
 # Shell plan: run upstream Omarchy inside a thin shell
 
-Status: plan of record, 2026-10-15. It supersedes the earlier research
-proposal. Nothing below has run in our VM yet; facts about upstream were
-checked against the repositories and the live package databases on this date.
+Status: plan of record, 2026-10-15, now implemented on branch
+`upstream-shell` (see [Implementation status](#implementation-status)). It
+supersedes the earlier research proposal. Facts about upstream were checked
+against the repositories and the live package databases on this date.
 
 ## Summary
 
@@ -19,6 +20,148 @@ channel for now. `rc` and `stable` follow once a release supports aarch64.
 This plan is forward-looking. It defines the system for new VMs; moving
 existing VMs onto it is a separate piece of work (see
 [Existing VMs](#existing-vms)).
+
+## Implementation status
+
+Branch `upstream-shell`, started 2026-10-15. The app now runs only this
+system. The direct-boot launcher, its storage library, boot fixes, migrations,
+boot recovery, the integration bundle and the old image pipeline are deleted;
+moving existing VMs over is deferred (see [Existing VMs](#existing-vms)).
+
+- **Factory** ([guest/factory](../guest/factory/README.md)): `make guest`
+  builds the `try-omarchy` package and then the stock install with the
+  pacstrap route below, not the ISO route. The ISO route needs a 6 GB offline
+  mirror and an archiso build, and upstream publishes no ARM ISO or VM image
+  yet. The install steps mirror upstream's orchestrator, and the result has the
+  same layout: btrfs subvolumes, Limine UKI, Snapper, `@factory`, and deferred
+  owner provisioning. Output goes to `dist/guest/`.
+- **Guest package** ([guest/package](../guest/package/README.md)): every
+  integration lives in `try-omarchy`, reading host settings from the
+  `tryomarchy.host` credential. The three replaced Omarchy commands, the
+  Ghostty/Vivaldi installers, the aarch64-unavailable guards, the pacman
+  restore hook and the migrations are not carried over. The JIS mode keys,
+  following the Mac's time zone, 1Password Touch ID and the console on
+  `hvc0` were added after the first build.
+- **Launcher** (`macos/run-qemu-gpu.sh`): UEFI boot with the edk2 firmware
+  from the pinned QEMU source (`make firmware`), one `shell/` VM directory
+  and a `shell-factory/` cache per storage folder, the bundled `try-omarchy`
+  package offered on every boot, storage-folder checks (APFS, free space,
+  ownership), bridge supervision with restarts, and cleanup of run
+  directories left by a killed launcher.
+- **App**: `make app` builds it around the factory. The start menu shows the
+  guest's Omarchy, channel and integration versions from
+  `dev.tryomarchy.guest`. VM moves and Trash work on the `shell/` layout.
+
+Integration updates became automatic rather than an **Update integrations**
+button. The guest installs the offered package only when it is newer than
+its own (`vercmp`), so the offer is a no-op for a current guest or one that
+already has a newer package.
+
+### Verified on 2026-10-15
+
+On an M2 Pro running macOS 27, using the app's own QEMU runtime and launcher
+(`Resources/scripts/run-qemu-gpu.sh` of a shell app build), started from the
+command line rather than the app's Launch button, windowed:
+
+- edk2 → Limine → the guest's own `linux-omarchy` 7.2.8 UKI boots. The VM
+  has no EL2 on this chip and takes the EL1 path.
+- Omarchy's own first-boot owner setup runs on tty1. Its time zone defaults
+  to the Mac's. The session then starts with autologin.
+- The stock omarchy-pkgs Hyprland 0.56.2 and Quickshell render through
+  VirGL. Rounded corners are clean at scale 1 and 2 (checked in `grim`
+  captures), so the `rounded-border-coverage` patch is not needed.
+- `omarchy-hw-platform` reports `aarch64` and `systemd-detect-virt` reports
+  `qemu`. Omarchy applies its own VM toggles (no animations, opaque windows).
+- The `tryomarchy.host` credential reaches the guest. The following work:
+  keyboard model, time zone, SSH on demand (sshd plus a ufw rule), clipboard
+  both ways, Mac audio devices, battery, camera device, guest status reports
+  to the app, the menu rows, and the start menu's version row.
+- Integration updates: a guest with `0.1.0-1` took `0.1.0-2` from the app at
+  boot, and later `0.1.0-3` → `0.1.0-4`. `pacman -U` of a newer package
+  inside the guest also works.
+- Disk growth: a 20 GiB factory disk opened at 64 GiB grew btrfs online to
+  62 GB.
+- A fresh VM from the final factory provisioned with Japanese seeded
+  (`LANG=ja_JP.UTF-8`). Every integration was up at the first login. The
+  factory cache took 9.0 GB on APFS after `--sparsify` (17 GB without it).
+- `omarchy update -y` inside the VM ran its whole flow and exited 0:
+  snapshot, keyrings, full upgrade, shell restart, mise, AUR. The snapshot
+  appears in Limine's Snapshots menu.
+
+Found and fixed along the way:
+
+- The owner is not in the `audio`, `video` or `users` groups, so the ports
+  are granted to the active session with `uaccess`.
+- Omarchy's firewall blocks port 22, so `ssh-access` opens it while SSH is
+  forwarded.
+- Omarchy's startup cursor reveal restored the guest cursor.
+- The first-boot language marker depended on build order. Seeding now
+  follows Omarchy's provisioning-pending marker.
+
+The first launch from the app's own **Launch** button failed: the launcher's
+control socket path and the app's direct-boot migration check did not match
+the app. Both are fixed.
+
+### Verified through the app on 2026-10-15
+
+A `make app` build, started as the app with its storage-folder override and
+**Skip launcher** set, so it took the same launch path as the **Launch**
+button. Owner setup ran once from the bundled launcher in a window, since the
+app holds QEMU's only control connection.
+
+- The app accepted the launcher's ready line and connected its sleep control;
+  every host bridge started, along with the shared folder, port forwarding and
+  a USB passthrough setting with no device attached.
+- Immersive full-screen: the guest ran at 3024×1900, scale 2, on a 3024×1964
+  Retina display, with the guest cursor hidden.
+- The guest took `try-omarchy` 0.1.0-8 from the app at boot (from 0.1.0-7),
+  and the start menu row showed `Omarchy 4.0.0.r7024.g246f33a-1 · edge`,
+  `Integrations 0.1.0-8`, **Current**.
+- **Try Omarchy Settings** inside the guest opened the app's settings window.
+- The shared folder mounted at `~/omarchy-shared`; a file written in the guest
+  appeared on the Mac.
+- Mac to guest clipboard, Mac audio devices, battery (95%, fully charged) and
+  the camera device. The time zone is recorded as following the Mac
+  (`mode: auto`) after owner setup; the setup form defaulted to the Mac's
+  zone.
+- The settings menu row has its icon; the **Touch ID for 1Password** row is
+  present. The JIS key step skipped itself on this ISO Mac.
+- Boot output reaches `console.log` through `hvc0`.
+- A shutdown from inside the guest ended the session in 6 seconds and left no
+  run directory.
+
+Found and fixed during this run:
+
+- Omarchy now ignores the power key (`10-ignore-power-button.conf`) and opens
+  its System menu instead, so the app's shutdown request for **Shut Down to
+  Manage** and **Restart** never shut the VM down. The package powers off on
+  the power key; the VM then stops 6 seconds after the request.
+- A screensaver closed before its own exit code ran left the cursor visible.
+  The package now hides it again a second after any window closes.
+
+Not verified yet:
+
+- Reset, **Restart** and **Shut Down to Manage**, and moving or deleting a VM
+  from the app's windows (no UI automation permission on the test Mac); their
+  launcher and QEMU paths were exercised directly.
+- Sleep and wake.
+- Guest to Mac clipboard in this run (verified earlier in the branch).
+- Touch ID for sudo and 1Password, a JIS Mac, and the time zone following a
+  change on the Mac.
+- Display sync while resizing a window: windowed, the guest started at
+  800×600 in a small window.
+- An M3+ host with nested virtualization.
+
+Not done yet:
+
+- The nightly CI job.
+- Porting the opt-in battery and memory-reclamation smoke tests, which booted
+  the old factory's kernel directly.
+- The **Managed by macOS** power-profile presentation and the screensaver
+  text fit, which needed Omarchy patches.
+- **Boot previous snapshot** in the launcher. Limine's menu has it.
+- The upstream asks below.
+- The issues and backlog in [Known VM issues](vm-issues.md).
 
 ## What upstream has today
 
@@ -45,7 +188,7 @@ existing VMs onto it is a separate piece of work (see
     path with no platform branch in its code.
 - **[omarchy-pkgs](https://github.com/omacom/omarchy-pkgs)** publishes to
   `https://pkgs.omarchy.org/edge/aarch64`: `omarchy` 4.0.4, `omarchy-dev`,
-  `omarchy-settings`, Omarchy's own aarch64 `hyprland` 0.56.2, `aquamarine`,
+  `omarchy-settings`, `omarchy-settings-dev`, Omarchy's own aarch64 `hyprland` 0.56.2, `aquamarine`,
   `hyprtoolkit`, `hyprland-guiutils`, `quickshell`, `linux-omarchy` 7.2.8 with
   headers, `ghostty`, `mise-bin`, `yay`, `ttfx`, `voxtype-bin`, `1password`,
   `omarchy-chromium-bin`, `walker`, and the Mac bare-metal packages.
@@ -55,6 +198,11 @@ existing VMs onto it is a separate piece of work (see
     app uses.
   - `rc` and `stable` carry only fast-ring vendor packages for aarch64. No
     `omarchy`, Hyprland or kernel yet.
+  - On edge, `omarchy-channel-set edge` installs `omarchy-dev` and
+    `omarchy-settings-dev`, built from the `quattro` branch. The `omarchy`
+    4.0.4 release package there predates the aarch64 platform work (no
+    `omarchy-pkg-defaults`, platform detector or image-target support), so an
+    ARM guest runs the development line until a release carries it.
   - `arm-mirror.omarchy.org` mirrors the live Arch Linux ARM repositories
     with no frozen snapshot; every channel shares it.
 - **[omarchy-iso#258](https://github.com/omacom/omarchy-iso/pull/258), merged
@@ -76,7 +224,10 @@ existing VMs onto it is a separate piece of work (see
   detector says `aarch64`, none of those hooks fire, and the Aurora kernel
   does not target `virt`. It is not a base for us; the package mirror is.
 
-## Why the current guest is fragile
+## Why the earlier guest was fragile
+
+This section describes the direct-boot guest the plan replaced; the files it
+names no longer exist in this branch.
 
 Updates are not blocked inside today's guest. They are held back in several
 ways, and that is where the maintenance cost comes from:
@@ -277,6 +428,10 @@ user's home, packages and settings over with an export-and-import flow of the
 kind `try-omarchy-windows` already has. The old disk stays until the user
 deletes it. Details are deferred until the new system is stable.
 
+The current implementation dropped the old launch path rather than keeping it:
+this version of the app ignores `disks/` and `boot/` and leaves them on disk
+untouched. Bringing old VMs forward is deferred.
+
 ## Phases
 
 1. **Spike (one to two days).** Build the aarch64 ISO from omarchy-iso
@@ -303,5 +458,10 @@ deletes it. Details are deferred until the new system is stable.
 - Publish an ARM nightly VM image from the existing `vm-seal` pipeline.
 - Accept `try-omarchy` in `omarchy-pkgs`, and whether a virtual platform may
   provide `omarchy-platform`.
-- Take the Hyprland border-coverage patch into the aarch64 Hyprland recipe if
-  the spike shows it is still needed.
+- ~~Take the Hyprland border-coverage patch into the aarch64 Hyprland
+  recipe~~: not needed; stock Hyprland renders cleanly in the VM.
+- A sanctioned place for a package to add Hyprland configuration and menu
+  rows. `try-omarchy` uses the user's toggles directory and a one-time edit
+  of the menu extension file today. Alternatives would be a lifecycle
+  registration (`setup-user`) for a VM integration package, or system-wide
+  drop-in directories.

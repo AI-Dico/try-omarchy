@@ -531,6 +531,41 @@ class Recipe(unittest.TestCase):
         consoles = re.findall(r"console=(\w+)", line)
         self.assertEqual(consoles, ["hvc0", "tty0"])
 
+    def test_cpu_drop_in_hides_sme_without_sve(self):
+        # The M4 has SME but no SVE; QEMU under HVF cannot hide SME.
+        text = (FILES / "etc/limine-entry-tool.d/50-try-omarchy-cpu.conf").read_text()
+        lines = [line for line in text.splitlines() if line.startswith("KERNEL_CMDLINE[default]+=")]
+        self.assertEqual(lines, ['KERNEL_CMDLINE[default]+=" arm64.nosme"'])
+        self.assertIn("'etc/limine-entry-tool.d/50-try-omarchy-cpu.conf'", (PACKAGE / "PKGBUILD").read_text())
+
+    def test_upgrade_rebuilds_limine_once_where_the_kernel_shows_sme(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tmp = Path(directory)
+            log = tmp / "calls"
+            limine = tmp / "limine.conf"
+            limine.write_text("")
+            for name in ("limine-update", "systemctl"):
+                (tmp / name).write_text(f'#!/bin/bash\nprintf "%s\\n" "{name} $*" >>"$TEST_LOG"\n')
+                (tmp / name).chmod(0o755)
+            cpuinfo, cmdline = tmp / "cpuinfo", tmp / "cmdline"
+            for features, running, boot, expected in (
+                ("fp asimd sme sme2", "quiet", limine, ["limine-update "]),
+                ("fp asimd sme sme2", "quiet arm64.nosme", limine, []),
+                ("fp asimd sme2", "quiet", limine, []),
+                ("fp asimd", "quiet", limine, []),
+                ("fp asimd sme", "quiet", tmp / "missing.conf", []),
+            ):
+                log.write_text("")
+                cpuinfo.write_text(f"Features\t: {features}\n")
+                cmdline.write_text(running + "\n")
+                subprocess.run(["/bin/bash", "-c", 'source "$1"; _hide_sme "$2" "$3" "$4"', "bash",
+                                str(PACKAGE / "try-omarchy.install"), cpuinfo, cmdline, boot], check=True,
+                               env={**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}", "TEST_LOG": str(log)})
+                calls = [line for line in log.read_text().splitlines() if line.startswith("limine-update")]
+                self.assertEqual(calls, expected, (features, running, boot.name))
+        install = (PACKAGE / "try-omarchy.install").read_text()
+        self.assertIn('if [ "$(vercmp "$2" 0.1.0-27)" -lt 0 ]; then\n    _hide_sme\n', install)
+
     def test_chromium_takes_input_methods(self):
         self.assertIn("--enable-wayland-ime", (FILES / "etc/chromium-flags.conf").read_text().split())
 

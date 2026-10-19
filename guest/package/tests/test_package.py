@@ -886,6 +886,13 @@ class Hyprland(unittest.TestCase):
         handler = profile[profile.index('hl.on("window.destroy"'):]
         self.assertIn("invisible = true", handler[:200])
 
+    def test_italian_on_apple_models_is_current_qwerty(self):
+        # xkeyboard-config's Apple Italian is the old QZERTY layout, where M types
+        # a comma; guest/tests/package-install.sh compiles the keymaps.
+        symbols = (FILES / "etc/xkb/symbols/macintosh_vndr/it").read_text()
+        self.assertEqual(re.findall(r'^default\s+xkb_symbols "(\w+)"', symbols, re.M), ["basic"])
+        self.assertIn('include "it(basic)"', symbols)
+
 
 class AuthenticationState(unittest.TestCase):
     def setUp(self):

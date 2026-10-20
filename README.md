@@ -4,9 +4,10 @@
 
 <h1 align="center">Try Omarchy</h1>
 
-<p align="center">The best way to run <a href="https://omarchy.org">Omarchy</a> on an Apple Silicon Mac.</p>
+<p align="center">Use Omarchy inside Apple's Ecosystem.</p>
+<p align="center">Compatible with Apple Silicon Macs. Use it as your daily driver, or give Omarchy a try and migrate to a native install.</p>
 
-Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine and bridges it to macOS. That includes the Retina display, the Mac keyboard, clipboard, audio, camera, battery, a shared folder and Touch ID. Omarchy itself is left untouched, so it behaves and updates like any other Omarchy install.
+Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine and bridges it to macOS. That includes Apple's universal clipboard, AirPods, Touch ID, the Retina display, Super shortcuts, Mac clipboard, audio, camera, battery, and a shared folder. The official Omarchy Mac image is used, so it behaves and updates like any other Omarchy install.
 
 <img width="1920" height="1173" alt="Try Omarchy on a MacBook Pro" src="https://github.com/user-attachments/assets/44f67c59-ba85-4819-8905-71b188bc02fe" />
 
@@ -14,37 +15,36 @@ Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine and b
 
 1. Download the latest `.dmg` from [Releases](https://github.com/omacom/try-omarchy/releases).
 2. Drag **Try Omarchy** to **Applications** and open it.
-3. Choose **Launch Omarchy**.
+3. Optionally configure permissions for the full experience.
+3. Click **Launch Omarchy**.
 
-The first launch downloads the Omarchy image (about 3 GB). If the download is interrupted, it resumes where it left off.
-
-You need an Apple Silicon Mac with macOS 15 or newer and about 15 GB of free space.
+The first launch downloads the Omarchy image (about 3 GB). You need an Apple Silicon Mac with macOS 15 or newer and about 15 GB of free space.
 
 ## How it works
 
 - **Omarchy is stock.** The VM runs the official `aarch64` Omarchy from Omarchy's own repositories. Try Omarchy adds one package, `try-omarchy`, and changes no file that Omarchy owns.
 - **Omarchy updates itself.** Run `omarchy update`, or use **Update → Omarchy**, whenever you like. Each update takes a snapshot first, so you can roll back from the boot menu.
-- **The app updates the Mac integrations.** Each app release brings a newer `try-omarchy` package, which the VM installs at its next boot.
-- **Edge channel for now.** Omarchy publishes for ARM on `edge` only. Once Omarchy releases its Mac image on `stable`, Try Omarchy will use `stable` too.
+- **The app updates the Mac integrations.** Each app release brings a newer, local `try-omarchy` package, which the VM installs at its next boot.
+- **Edge channel for now.** Omarchy publishes for ARM on `edge` only.
 
 ## What you get
 
 - Native CPU speed through Apple's Hypervisor framework, and GPU-accelerated graphics
-- A full-screen or windowed desktop that follows your display's resolution and scaling
-- Command works as Super. Mac keyboard layouts (ANSI, ISO and JIS) are mapped correctly
+- A full-screen or windowed desktop that follows your display's resolution, scaling and supports the notch
+- Command works as Super. Mac keyboard layouts are mapped correctly
 - Two-way clipboard for text and images
 - Mac audio output and microphone, with live device switching
 - The Mac camera, available to Omarchy as a webcam
-- The Mac's battery in the Omarchy bar
+- The Mac's battery in the Omarchy bar, including detailed information
 - One shared Mac folder, under the same name (`~/Work` stays `~/Work`)
 - Touch ID for `sudo` and 1Password
 - Port forwarding, SSH, bridged networking and USB passthrough (experimental)
 
 **Limitations:**
 
-- Video decoding uses the CPU, so high-resolution playback can stutter.
+- Video decoding uses the CPU, so multiple high-resolution playback can stutter.
 - Vulkan is not available.
-- Nested virtualization is opt-in.
+- Nested virtualization is opt-in for now.
 
 ## Manual
 

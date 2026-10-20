@@ -4,12 +4,9 @@
 
 <h1 align="center">Try Omarchy</h1>
 
-<p align="center">Use Omarchy inside Apple's Ecosystem.</p>
-<p align="center">Compatible with Apple Silicon Macs. Use it as your daily driver, or give Omarchy a try and migrate to a native install.</p>
+<h3 align="center">Omarchy inside Apple's Ecosystem.</h3>
 
-Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine and bridges it to macOS. That includes Apple's universal clipboard, AirPods, Touch ID, the Retina display, Super shortcuts, Mac clipboard, audio, camera, battery, and a shared folder. The official Omarchy Mac image is used, so it behaves and updates like any other Omarchy install.
-
-<img width="1920" height="1173" alt="Try Omarchy on a MacBook Pro" src="https://github.com/user-attachments/assets/44f67c59-ba85-4819-8905-71b188bc02fe" />
+Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine deeply integrated with macOS. Use it as your daily driver, or give Omarchy a try and migrate to a native install. Integrations include Apple's universal clipboard, AirPods, Touch ID, the Retina display, Super shortcuts, Mac clipboard, audio, camera, battery, and a shared folder. The official Omarchy Mac image is used, so it behaves and updates like any other Omarchy install.
 
 ## Get started
 
@@ -19,6 +16,8 @@ Try Omarchy is a Mac app that runs stock Omarchy in a fast virtual machine and b
 3. Click **Launch Omarchy**.
 
 The first launch downloads the Omarchy image (about 3 GB). You need an Apple Silicon Mac with macOS 15 or newer and about 15 GB of free space.
+
+<img width="1920" height="1173" alt="Try Omarchy on a MacBook Pro" src="https://github.com/user-attachments/assets/44f67c59-ba85-4819-8905-71b188bc02fe" />
 
 ## How it works
 

@@ -307,7 +307,7 @@ private struct HomePane: View {
             if state.shutdownInProgress { ProgressView().controlSize(.small) }
         } else {
             Button(action: actions.launchOrDone) {
-                Label(state.launchInProgress ? "Launching…" : "Launch Omarchy", systemImage: "play.fill")
+                Label(state.launchButtonTitle, systemImage: "play.fill")
                     .padding(.horizontal, 8)
             }
             .buttonStyle(.borderedProminent)

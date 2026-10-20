@@ -148,6 +148,21 @@ final class LauncherState {
         return launchInProgress ? launchStatus : "Launch Omarchy"
     }
 
+    /// One word for the Home button; the status line beside it has the detail.
+    var launchButtonTitle: String {
+        guard launchInProgress else { return "Launch Omarchy" }
+        switch launchDownload?.phase {
+        case .waiting, .downloading, .retrying: return "Downloading…"
+        case .verifying: return "Verifying…"
+        case nil: break
+        }
+        switch launchProgress.phase {
+        case .checking, .starting: return "Launching…"
+        case .verifying: return "Verifying…"
+        case .preparing, .finishing: return "Preparing…"
+        }
+    }
+
 
     var runningActionsEnabled: Bool { !controlsBusy && !permissionRequestInFlight }
 

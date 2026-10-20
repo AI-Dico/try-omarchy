@@ -39,10 +39,16 @@ struct StartMenuLauncherTests {
         let download = FactoryDownloadProgress(phase: .downloading, completedBytes: 1, totalBytes: 4)
         menu.launchDidDownload(download)
         #expect(menu.state.launchTitle == download.title)
+        #expect(menu.state.launchFraction == 0.25)
         menu.launchDidFinishDownload()
         #expect(menu.state.launchTitle == VMLaunchPhase.checking.buttonTitle)
-        menu.launchDidProgress(to: .starting)
+        #expect(menu.state.launchFraction == nil)
+        menu.launchDidProgress(to: VMProgress(phase: .preparing, percent: 40))
+        #expect(menu.state.launchTitle == "Unpacking Omarchy… 40%")
+        #expect(menu.state.launchFraction == 0.4)
+        menu.launchDidProgress(to: VMProgress(phase: .starting))
         #expect(menu.state.launchTitle == VMLaunchPhase.starting.buttonTitle)
+        #expect(menu.state.launchFraction == nil)
 
         menu.virtualMachineDidStart { closeCount += 1 }
         #expect(menu.state.launchTitle == "Done")

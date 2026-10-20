@@ -63,7 +63,7 @@ final class LauncherState {
 
     var isRunning = false
     var launchInProgress = false
-    var launchPhase = VMLaunchPhase.checking
+    var launchProgress = VMProgress(phase: VMLaunchPhase.checking)
     /// Set while the factory image downloads, before the launcher runs.
     var launchDownload: FactoryDownloadProgress?
     var shutdownInProgress = false
@@ -129,7 +129,19 @@ final class LauncherState {
         return isRunning || !launchInProgress
     }
 
-    var launchStatus: String { launchDownload?.title ?? launchPhase.buttonTitle }
+    var launchStatus: String { launchDownload?.title ?? launchProgress.title }
+
+    /// How much of the current launch step is done, when it can be measured.
+    var launchFraction: Double? {
+        guard launchInProgress else { return nil }
+        if let launchDownload {
+            switch launchDownload.phase {
+            case .downloading, .retrying: return Double(launchDownload.percent) / 100
+            case .waiting, .verifying: return nil
+            }
+        }
+        return launchProgress.percent.map { Double($0) / 100 }
+    }
 
     var launchTitle: String {
         if isRunning { return "Done" }

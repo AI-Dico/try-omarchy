@@ -316,7 +316,13 @@ private struct HomePane: View {
             .disabled(!state.launchEnabled)
             .accessibilityLabel(state.launchTitle)
             .accessibilityIdentifier("launch-button")
-            if state.launchInProgress { ProgressView().controlSize(.small) }
+            if let fraction = state.launchFraction {
+                ProgressView(value: fraction)
+                    .frame(width: 120)
+                    .accessibilityLabel(state.launchStatus)
+            } else if state.launchInProgress {
+                ProgressView().controlSize(.small)
+            }
         }
     }
 }
